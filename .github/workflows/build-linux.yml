@@ -7,6 +7,10 @@ on:
   push:
     tags: ['v*']
 
+# Nécessaire pour que l'étape "Joindre à la release" puisse écrire sur la release.
+permissions:
+  contents: write
+
 jobs:
   appimage:
     runs-on: ubuntu-latest

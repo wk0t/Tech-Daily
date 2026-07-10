@@ -1,151 +1,98 @@
-# 📰 Tech & Cyber Daily
+# Tech & Cyber Daily
 
-> Ton magazine quotidien d'actualités **tech, cybersécurité et intelligence artificielle** — sur PC et sur Android.
+Un petit magazine qui me sort chaque jour l'actu **tech, cybersécurité et IA**, sur PC et sur Android. J'en avais marre de faire le tour de quinze sites bourrés de pubs et de bandeaux cookies juste pour lire trois news qui m'intéressent — alors j'ai fait mon propre truc.
 
-Chaque jour, l'application va chercher les dernières news auprès de **27 médias** francophones et anglophones, ne garde que ce qui parle vraiment d'informatique, retire les publicités, traduit automatiquement les articles anglais en français, et te les présente comme un vrai magazine — avec **lecture intégrée** (l'article s'ouvre directement dans l'app, sans redirection vers un site bourré de pubs).
+L'appli va chercher les articles chez **27 médias** (français et anglais), jette tout ce qui n'est pas de l'informatique, vire les pubs, traduit l'anglais en français, et me présente ça comme un vrai magazine. L'article s'ouvre **dans l'appli** — pas de redirection vers un site qui rame. Pas de compte, pas de pub, pas de mouchard.
 
-Le tout **sans compte, sans pub, sans traçage**.
+## Ce que ça sait faire
 
----
+Le principal, c'est le magazine du jour : les news des dernières 24 h, triées, nettoyées, traduites, avec une image de couverture et le texte complet lisible directement. Le filtrage est assez agressif — si un article parle de bons plans Amazon ou de politique, il dégage.
 
-## ✨ Fonctionnalités
+Autour de ça j'ai empilé pas mal de confort de lecture :
 
-**Le magazine**
-- 🔄 Récupération automatique des news depuis 27 sources (cyber, tech, IA, hardware)
-- 🧹 Filtrage intelligent : uniquement du contenu informatique, zéro bon plan / pub / hors-sujet
-- 🌐 Traduction automatique français des articles anglophones
-- 📖 Lecture intégrée de l'article (texte + images extraits proprement, sans les pubs du site)
-- 🖼️ Une image de couverture pour chaque article (via le flux ou la page)
+- recherche par mot-clé, sujet ou source ;
+- **sujets suivis** : je marque « ransomware » ou « Apple » et les articles concernés remontent en haut, surlignés ;
+- **favoris** consultables hors ligne, articles déjà lus grisés, temps de lecture estimé ;
+- un **résumé en une ligne** (TL;DR) en tête de chaque article ;
+- un **glossaire au toucher** : je touche un terme technique, j'ai sa définition en français simple ;
+- **mode podcast** (lecture vocale enchaînée, mains libres) et lecture d'un seul article à voix haute ;
+- thème clair / sombre, archives des 7 derniers jours, partage.
 
-**Pour lire mieux**
-- 🔍 Recherche par mot-clé, sujet ou source
-- ⭐ Sujets suivis (les articles correspondants remontent et sont surlignés)
-- ❤️ Favoris / lire plus tard (accessibles hors ligne)
-- 🕶️ Articles déjà lus grisés
-- ⏱️ Temps de lecture estimé
-- ⚡ Résumé « en bref » (TL;DR) en tête de chaque article
-- 📖 Glossaire au toucher : touche un terme technique pour sa définition en français simple
-- 🎧 Mode podcast : lecture vocale enchaînée, mains-libres
-- 🔊 Synthèse vocale d'un article
-- 🌗 Thème clair / sombre
-- 👍👎 Personnalisation : vote sur les sources
-- 📚 Archives des 7 derniers jours
-- ↗️ Partage d'un article
+Et comme c'est orienté cyber, il y a un peu de sel en plus : une **alerte menace** qui met en avant les news critiques (0-day, ransomware, faille exploitée), un **niveau de menace du jour**, un petit **quiz sécurité** et l'astuce du jour.
 
-**Spécial cyber**
-- 🔴 Alerte menace : les news critiques (0-day, ransomware, faille exploitée…) sont mises en avant
-- ⛈️ Niveau de menace du jour (Calme → Tempête cyber)
-- 🧠 Quiz sécurité du jour
+L'appli se prévient elle-même quand une nouvelle version sort (un bandeau, rien de plus — elle ne télécharge jamais rien toute seule).
 
-**Bonus**
-- 💡 Astuce sécurité du jour
-- 🔔 Mise à jour automatique : l'app te prévient quand une nouvelle version est disponible
+## Installer
 
----
+### Windows
 
-## 📥 Installation (pour utiliser l'app)
+Récupère **[`TechCyberDaily.exe`](../../releases/latest)**, double-clique, et le magazine du jour s'ouvre dans ton navigateur. Au premier lancement Windows va râler avec SmartScreen (normal, c'est pas signé) → *Informations complémentaires* → *Exécuter quand même*.
 
-### 💻 Sur PC (Windows)
-1. Télécharge **[`TechCyberDaily.exe`](TechCyberDaily.exe)**.
-2. Double-clique dessus. Le magazine du jour s'ouvre dans ton navigateur.
-3. Au premier lancement, Windows peut afficher un avertissement SmartScreen (normal pour un programme non signé) → **Informations complémentaires → Exécuter quand même**.
+Si tu veux qu'il s'ouvre tout seul le matin, lance `pc/Activer_ouverture_auto.ps1` (clic droit → Exécuter avec PowerShell).
 
-> Astuce : lance `pc/Activer_ouverture_auto.ps1` (clic droit → Exécuter avec PowerShell) pour ouvrir le magazine automatiquement chaque matin.
+### Android
 
-### 📱 Sur Android
-1. Télécharge **[`TechCyberDaily.apk`](TechCyberDaily.apk)** sur ton téléphone.
-2. Ouvre le fichier → autorise l'installation d'applications de sources inconnues quand Android le demande.
-3. Si Play Protect prévient (normal pour une app hors Play Store) → **Installer quand même**.
+Télécharge **[`TechCyberDaily.apk`](../../releases/latest)** sur le téléphone, ouvre-le, et autorise l'installation depuis une source inconnue quand Android le demande. Play Protect va prévenir (normal, l'appli n'est pas sur le Play Store) → *Installer quand même*. Il faut Android 7.0 ou plus récent.
 
-Android 7.0 (Nougat) ou plus récent.
+### Linux
 
-### 🐧 Sur Linux
-Télécharge **`TechCyberDaily-x86_64.AppImage`** (produit par GitHub Actions, voir plus bas), rends-le exécutable et lance-le :
+Prends le **`.AppImage`** dans la [dernière release](../../releases/latest), rends-le exécutable et lance-le :
+
 ```bash
 chmod +x TechCyberDaily-x86_64.AppImage
 ./TechCyberDaily-x86_64.AppImage
 ```
-Le magazine s'ouvre dans ton navigateur. (Nécessite `python3`, présent par défaut sur la plupart des distributions.)
 
-### 🍎 Sur iPhone (iOS, via sideloading — DMA / UE)
-Un `.ipa` **non signé** est produit par GitHub Actions. Pour l'installer sur un iPhone, tu le **signes avec ton propre Apple ID** grâce à un outil de sideloading — c'est autorisé dans l'Union européenne grâce à la DMA :
-1. Installe **[AltStore](https://altstore.io)** (ou Sideloadly) sur ton PC/Mac.
-2. Connecte ton iPhone, ouvre AltStore, connecte-toi avec ton Apple ID (gratuit).
-3. Installe le fichier `TechCyberDaily-unsigned.ipa` → AltStore le re-signe et l'installe.
+Le magazine s'ouvre dans le navigateur. Il faut juste `python3`, présent d'office sur la plupart des distros.
 
-> Un Apple ID gratuit suffit (l'app est à ré-signer tous les 7 jours). Un compte développeur Apple (99 €/an) permet une signature d'un an et une vraie distribution alternative.
+### iPhone
 
----
+Le `.ipa` de la release est **non signé**. Pour l'installer, tu le signes avec ton propre Apple ID via un outil de sideloading — c'est permis dans l'UE grâce au DMA :
 
-## 🔄 Mise à jour automatique
+1. installe [AltStore](https://altstore.io) (ou Sideloadly) sur ton ordi ;
+2. branche l'iPhone, ouvre AltStore, connecte-toi avec ton Apple ID (un compte gratuit suffit) ;
+3. installe `TechCyberDaily-unsigned.ipa` → AltStore le re-signe et le pose sur le téléphone.
 
-L'application compare sa version à celle publiée dans [`version.json`](version.json). Quand une version plus récente est disponible, un bandeau **« 🔔 Nouvelle version disponible »** apparaît avec un lien de téléchargement. L'app ne télécharge et n'installe **jamais** rien toute seule — c'est toi qui décides.
+Avec un Apple ID gratuit, il faut le ré-installer tous les 7 jours. Un compte développeur (99 €/an) tient un an.
 
-**Pour publier une mise à jour** (côté mainteneur) :
-1. Modifie le code, reconstruis l'`.exe` et l'`.apk` (voir ci-dessous).
-2. Remplace `TechCyberDaily.exe` et `TechCyberDaily.apk` à la racine du dépôt.
-3. Incrémente le numéro dans `version.json` (ex. `1.0.0` → `1.1.0`) et adapte les `notes`.
-4. Pousse le tout sur GitHub. Les apps installées afficheront le bandeau.
+## Compiler soi-même
 
----
+**PC** — rien à installer, le compilateur C# est fourni avec Windows :
 
-## 🛠️ Construire depuis les sources
-
-### PC
-Aucun outil à installer (le compilateur C# est fourni avec Windows) :
 ```powershell
-pc\build_exe.ps1     # génère TechCyberDaily.exe
+pc\build_exe.ps1
 ```
 
-### Android
-Nécessite un JDK 17 et le SDK Android (build-tools 34, platform android-34). Compilation **sans Gradle**, avec `aapt` + `d8` + `apksigner` :
+**Android** — il faut un JDK 17 et le SDK Android (build-tools 34). Pas de Gradle, je fais tout à la main avec `aapt` + `d8` + `apksigner` :
+
 ```powershell
-android\build_apk.ps1     # génère TechCyberDaily.apk
-```
-> La clé de signature (`techcyber.jks`) n'est volontairement **pas** incluse dans le dépôt. Le script en régénère une automatiquement au premier build.
-
-### 🐧 Linux (.AppImage) et 🍎 iOS (.ipa) — via GitHub Actions
-Ces deux formats se compilent respectivement **sur Linux et sur macOS**. Plutôt que d'avoir ces machines, le dépôt embarque des recettes **GitHub Actions** qui les construisent pour toi, gratuitement, sur les serveurs de GitHub :
-
-- **Linux** : onglet **Actions → « Build Linux (.AppImage) » → Run workflow**. Récupère le fichier dans les *artifacts* (ou joint automatiquement à une release si tu pousses un tag `v*`).
-- **iOS** : onglet **Actions → « Build iOS (.ipa non signé) » → Run workflow**. Récupère le `.ipa` non signé dans les *artifacts*, puis signe-le avec ton Apple ID (AltStore).
-
-En local : `linux/build_appimage.sh` (sur Linux) ; `cd ios && xcodegen generate && open` (sur macOS avec Xcode).
-
----
-
-## 🗂️ Structure du projet
-
-```
-tech-daily/
-├── pc/                          Version PC (PowerShell → .exe)
-│   ├── TechCyberDaily.ps1         Moteur : récupération, filtres, traduction, extraction, génération HTML
-│   ├── build_exe.ps1             Compile le script en .exe autonome
-│   └── *_ouverture_auto.ps1      Activer / désactiver l'ouverture automatique du matin
-├── android/                     Version Android (WebView native)
-│   ├── assets/index.html         L'application complète (interface + logique)
-│   ├── src/.../MainActivity.java Pont natif : réseau, cache, voix, notification
-│   ├── src/.../NotifReceiver.java Notification quotidienne
-│   ├── src/.../WidgetProvider.java Widget écran d'accueil
-│   ├── AndroidManifest.xml
-│   └── build_apk.ps1             Compile l'.apk
-├── version.json                 Version publiée (pour la mise à jour auto)
-├── TechCyberDaily.exe            Binaire PC prêt à l'emploi
-└── TechCyberDaily.apk            Binaire Android prêt à l'emploi
+android\build_apk.ps1
 ```
 
----
+La clé de signature (`techcyber.jks`) n'est volontairement pas dans le dépôt — le script en génère une au premier build.
 
-## ⚙️ Comment ça marche
+**Linux et iOS** se compilent sur Linux et macOS. Comme je n'ai ni l'un ni l'autre sous la main, le dépôt embarque deux recettes **GitHub Actions** qui les construisent gratuitement sur les serveurs de GitHub (onglet *Actions* → *Run workflow*, ou automatiquement quand je pousse un tag `v*`). En local, ce serait `linux/build_appimage.sh` côté Linux et `cd ios && xcodegen generate` côté Mac.
 
-Les news sont récupérées **directement** depuis les flux RSS publics des médias (pas de serveur intermédiaire). Sur PC, c'est PowerShell qui fait le travail ; sur Android, un pont natif Java contourne les restrictions du navigateur (CORS) et gère l'encodage. Le contenu complet des articles est extrait de la page d'origine, nettoyé de ses publicités, puis affiché dans un lecteur intégré. La traduction utilise le point d'accès public gratuit de Google Traduction.
+## Comment ça marche
 
----
+Les news sont récupérées **directement** depuis les flux RSS publics des médias, sans serveur intermédiaire. Sur PC c'est du PowerShell ; sur Android un pont natif en Java contourne les restrictions du navigateur (CORS) et gère l'encodage à la main. Le texte complet de chaque article est extrait de sa page d'origine, débarrassé de ses pubs, puis affiché dans le lecteur intégré. Pour la traduction, j'utilise le point d'accès public et gratuit de Google Traduction.
 
-## 📝 Note
+Rien n'est stocké ailleurs que sur ton appareil.
 
-Projet personnel, fourni tel quel. Les articles restent la propriété de leurs médias respectifs ; chaque article garde un lien vers sa source d'origine. L'application se contente d'agréger et de mettre en forme des flux publics pour un usage privé.
+## Le dépôt en deux mots
 
-## 📄 Licence
+```
+pc/         la version PC : un gros script PowerShell (le moteur) + le build en .exe
+android/    la version Android : une WebView + un pont natif Java, compilée en .apk
+linux/      la recette AppImage
+ios/        la recette iOS (WebView Swift)
+version.json  la version publiée, pour la mise à jour auto
+```
+
+## Note
+
+Projet perso, fourni tel quel. Les articles restent la propriété de leurs médias — chacun garde un lien vers sa source. L'appli ne fait qu'agréger et mettre en forme des flux publics pour un usage privé.
+
+## Licence
 
 [MIT](LICENSE) — fais-en ce que tu veux.

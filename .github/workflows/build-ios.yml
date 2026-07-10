@@ -1,11 +1,18 @@
 name: Build iOS (.ipa non signé)
 
-# À lancer à la main depuis l'onglet Actions -> "Run workflow".
+# Lance-le à la main (onglet Actions -> "Run workflow") ou automatiquement
+# quand tu pousses un tag de version (ex : v1.0.1).
 # Produit un .ipa NON SIGNÉ : tu l'installes ensuite sur ton iPhone via
 # AltStore / Sideloadly (qui le re-signe avec ton Apple ID). Dans l'UE, la DMA
 # autorise ce sideloading.
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
+
+# Nécessaire pour que l'étape "Joindre à la release" puisse écrire sur la release.
+permissions:
+  contents: write
 
 jobs:
   ios:
@@ -47,3 +54,9 @@ jobs:
         with:
           name: TechCyberDaily-iOS-unsigned
           path: TechCyberDaily-unsigned.ipa
+
+      - name: Joindre à la release (si tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TechCyberDaily-unsigned.ipa
