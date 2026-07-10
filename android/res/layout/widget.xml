@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="12dp"
+    android:background="#151b2b">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tech &amp; Cyber Daily"
+        android:textColor="#e7ecf5"
+        android:textStyle="bold"
+        android:textSize="15sp"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ton actu tech, cyber &amp; IA — touche pour ouvrir"
+        android:textColor="#8b96ad"
+        android:textSize="11sp"
+        android:layout_marginTop="4dp"/>
+</LinearLayout>

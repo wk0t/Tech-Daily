@@ -1,0 +1,20 @@
+# Artefacts de compilation Android
+android/build/
+*.class
+*.dex
+
+# Clé de signature — NE JAMAIS committer (secret)
+*.jks
+*.keystore
+
+# Sortie temporaire du magazine PC
+magazine.html
+TechCyberDaily_magazine.html
+
+# Divers
+*.log
+Thumbs.db
+.DS_Store
+
+# Script de push local (perso)
+Pousser_sur_GitHub.ps1

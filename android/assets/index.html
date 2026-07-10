@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<!--
+  Tech & Cyber Daily — application Android (WebView)
+  ---------------------------------------------------
+  Application complète en un seul fichier : interface + logique.
+  Elle tourne dans une WebView Android et dialogue avec le code natif
+  (MainActivity.java) via l'objet « AndroidBridge » pour :
+    - récupérer les flux et pages web (sans blocage CORS),
+    - lire les articles à voix haute (synthèse vocale native),
+    - garder les news en cache pour la lecture hors ligne,
+    - partager un article.
+
+  Organisation du script (voir plus bas) :
+    1. Sources RSS et sélecteurs de contenu par site
+    2. Filtres (anti-pub, pertinence informatique, catégories)
+    3. Pont natif + traduction FR
+    4. Récupération, extraction et regroupement des articles
+    5. Rendu (cartes, lecteur intégré, digest, quiz, etc.)
+    6. Fonctions bonus (menace, glossaire, podcast, thème, votes…)
+    7. Mise à jour automatique via GitHub
+-->
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tech &amp; Cyber Daily</title>
+<style>
+  :root{
+    --bg:#0b0e14;--card:#151b2b;--card2:#1b2233;--line:#232c42;--txt:#e7ecf5;--muted:#8b96ad;
+    --accent:#4f7cff;--accent2:#12d6a5;--gold:#ffb020;--radius:16px;--shadow:0 8px 24px rgba(0,0,0,.35);--fs:1;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(900px 500px at 80% -10%, rgba(79,124,255,.14), transparent 60%),
+      radial-gradient(700px 400px at -10% 10%, rgba(18,214,165,.10), transparent 55%),var(--bg);
+    color:var(--txt);font-family:'Segoe UI',system-ui,Roboto,Arial,sans-serif;line-height:1.5;min-height:100vh;
+    padding-top:env(safe-area-inset-top);font-size:calc(16px * var(--fs));
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:18px 14px 80px}
+  header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+  .brand h1{margin:0;font-size:24px;font-weight:800;background:linear-gradient(90deg,#fff,#a9c1ff 60%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand .kick{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:4px}
+  .brand .kick .dot{width:7px;height:7px;border-radius:50%;background:var(--accent2);box-shadow:0 0 10px var(--accent2)}
+  .sub{font-size:12px;color:var(--muted);margin-top:4px;text-transform:capitalize}
+  .hbtns{display:flex;gap:6px}
+  .iconbtn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:16px;cursor:pointer;flex:0 0 auto}
+  .iconbtn.on{border-color:var(--accent);color:#fff;background:var(--card2)}
+  .searchbar{display:flex;gap:8px;margin-bottom:12px}
+  .searchbar input{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--txt);padding:10px 14px;font-size:14px;outline:none}
+  .searchbar input:focus{border-color:var(--accent)}
+  .tip{position:relative;overflow:hidden;background:linear-gradient(120deg,#16233f,#171e30 60%);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .tip .lbl{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);font-weight:800}
+  .tip h2{margin:6px 0 4px;font-size:16px}.tip p{margin:0;color:#cbd5ea;font-size:13px}
+  /* Digest */
+  .digest{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
+  .digest .lbl{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:800;margin-bottom:8px}
+  .digest ol{margin:0;padding-left:20px}
+  .digest li{margin:0 0 7px;font-size:14px;line-height:1.4;cursor:pointer}
+  .digest li:last-child{margin-bottom:0}
+  .digest li b{color:var(--txt);font-weight:600}
+  .digest li span{color:var(--muted);font-size:11.5px}
+  /* Topics */
+  .topics{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .topics .tlab{font-size:11px;color:var(--muted);font-weight:700}
+  .topic{display:inline-flex;align-items:center;gap:5px;background:rgba(255,176,32,.13);border:1px solid rgba(255,176,32,.35);color:var(--gold);padding:4px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .topic b{cursor:pointer;opacity:.7}
+  .topic-add{background:var(--card);border:1px dashed var(--line);color:var(--muted);padding:4px 10px;border-radius:999px;font-size:12px;cursor:pointer}
+  .filters{display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:12px;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--muted);padding:8px 15px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.fav.active{background:#ff4d6d;border-color:#ff4d6d}
+  .count{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:560px){.grid{grid-template-columns:1fr 1fr}}
+  .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit;box-shadow:var(--shadow)}
+  .card:active{transform:scale(.985)}
+  .card.read{opacity:.55}
+  .card.pin{border-color:rgba(255,176,32,.5)}
+  .thumb{position:relative;aspect-ratio:16/9;background:#0e131f;overflow:hidden}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .noimg{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;opacity:.4}
+  .badge{position:absolute;left:10px;top:10px;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:4px 9px;border-radius:7px;color:#fff}
+  .b-cyber{background:rgba(255,77,109,.92)}.b-ia{background:rgba(176,107,255,.92)}.b-tech{background:rgba(79,124,255,.92)}.b-hard{background:rgba(255,176,32,.94);color:#1a1400}
+  .heart{position:absolute;right:8px;top:8px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(11,14,20,.6);color:#fff;font-size:16px;cursor:pointer;backdrop-filter:blur(4px);z-index:2}
+  .heart.on{color:#ff4d6d}
+  .pinstar{position:absolute;right:8px;bottom:8px;font-size:15px;filter:drop-shadow(0 1px 2px #000)}
+  .body{padding:13px 15px 15px;display:flex;flex-direction:column;gap:7px;flex:1}
+  .src{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--muted);gap:6px}
+  .src .name{font-weight:700;color:#aab6cf}
+  .src .tr{margin-left:6px;font-weight:600;font-size:10px;color:var(--accent2);background:rgba(18,214,165,.12);border:1px solid rgba(18,214,165,.3);padding:1px 6px;border-radius:6px}
+  .src .meta{white-space:nowrap}
+  .card h3{margin:0;font-size:15.5px;line-height:1.35}
+  .card h3 mark{background:rgba(255,176,32,.28);color:inherit;border-radius:3px;padding:0 2px}
+  .card .excerpt{margin:0;font-size:13px;color:var(--muted);flex:1}
+  .card .go{margin-top:4px;font-size:12px;font-weight:700;color:var(--accent)}
+  .relnote{font-size:11.5px;color:var(--accent2);font-weight:600}
+  .status{text-align:center;padding:50px 16px;color:var(--muted)}
+  .status .big{font-size:18px;color:var(--txt);margin-bottom:8px}
+  .refreshbar{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:40}
+  .refreshbar button{width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:var(--accent);color:#fff;font-size:22px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .refreshbar button:active{transform:scale(.92)}
+  .refreshbar button.spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  footer{margin-top:36px;text-align:center;color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:16px}
+  .skeleton{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .skeleton .sk{background:linear-gradient(90deg,#151b2b,#1d2740,#151b2b);background-size:200% 100%;animation:sh 1.3s infinite}
+  @keyframes sh{to{background-position:-200% 0}}
+  .sk.img{aspect-ratio:16/9}.sk.line{height:11px;margin:11px 14px;border-radius:6px}.sk.line.s{width:40%}
+
+  /* Panneaux modaux (réglages) */
+  .modal{position:fixed;inset:0;background:rgba(4,7,14,.82);backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center;z-index:60}
+  .modal.open{display:flex}
+  .sheet{background:var(--card2);border:1px solid var(--line);border-radius:20px 20px 0 0;width:100%;max-width:720px;max-height:82vh;overflow-y:auto;padding:18px 18px calc(24px + env(safe-area-inset-bottom))}
+  .sheet h3{margin:2px 0 14px;font-size:18px}
+  .setrow{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .setrow:last-child{border-bottom:none}
+  .toggle{width:46px;height:26px;border-radius:999px;border:1px solid var(--line);background:var(--card);position:relative;cursor:pointer;flex:0 0 auto}
+  .toggle.on{background:var(--accent);border-color:var(--accent)}
+  .toggle .knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.15s}
+  .toggle.on .knob{left:22px}
+  .srcgrid{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+  .srctag{font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer}
+  .srctag.on{border-color:var(--accent2);color:var(--accent2);background:rgba(18,214,165,.1)}
+  .fsbtns{display:flex;gap:6px}
+  .fsbtns button{width:34px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--txt);cursor:pointer}
+  .closebtn{margin-top:14px;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--accent);color:#fff;font-weight:700;font-size:14px;cursor:pointer}
+
+  /* ---- Lecture intégrée (plein écran mobile) ---- */
+  .reader-backdrop{position:fixed;inset:0;background:var(--bg);display:none;z-index:50;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .reader{max-width:720px;margin:0 auto;padding:14px 16px calc(40px + env(safe-area-inset-bottom));padding-top:calc(14px + env(safe-area-inset-top))}
+  .rbar{position:sticky;top:0;display:flex;justify-content:space-between;gap:8px;z-index:2;padding:4px 0;background:linear-gradient(var(--bg),var(--bg) 70%,transparent)}
+  .rbar .rgroup{display:flex;gap:8px}
+  .rbtn{width:42px;height:42px;border-radius:13px;border:1px solid var(--line);background:var(--card);color:var(--txt);font-size:17px;cursor:pointer}
+  .rbtn.on{border-color:var(--accent);color:#fff}
+  .rbtn.fav.on{color:#ff4d6d;border-color:#ff4d6d}
+  .rmeta{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:4px}
+  .rmeta .badge{position:static}
+  .rmeta .rsrc{font-weight:700;color:#aab6cf}
+  .rmeta .tr{font-weight:600;color:var(--accent2);background:rgba(18,214,165,.12);border:1px solid rgba(18,214,165,.3);padding:2px 8px;border-radius:6px}
+  .rtitle{font-size:21px;line-height:1.3;margin:10px 0 6px}
+  .rtime{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+  .reader img{max-width:100%;border-radius:11px;margin:5px 0 14px;display:block}
+  .reader p{font-size:15px;line-height:1.75;color:#d5dcec;margin:0 0 13px}
+  .reader p mark,.reader h3 mark{background:rgba(255,176,32,.28);color:inherit;border-radius:3px;padding:0 2px}
+  .reader h3{font-size:17px;margin:20px 0 9px;color:#fff}
+  .rnote{color:var(--muted);font-style:italic}
+  .rload{color:var(--muted);text-align:center;padding:26px 0;font-size:14px}
+  .rrelated{margin:14px 0;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px;font-size:13px}
+  .rrelated .rl{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .rrelated a{display:block;color:var(--accent);text-decoration:none;padding:3px 0}
+  .rsource{display:inline-block;margin-top:14px;color:var(--accent);font-weight:700;text-decoration:none;font-size:13px;border:1px solid var(--line);padding:9px 15px;border-radius:11px}
+  /* --- fonctions bonus --- */
+  .card.crit{border-color:rgba(255,77,109,.6)}
+  .alertpill{color:#ff4d6d;font-weight:800;font-size:10.5px;margin-right:5px}
+  .menace{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);margin-bottom:14px}
+  .menace b{font-weight:800}
+  .quiz{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;display:none}
+  .quiz .lbl{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#b06bff;font-weight:800;margin-bottom:8px}
+  .quiz .qq{font-size:15px;font-weight:600;margin-bottom:10px}
+  .qopts{display:flex;flex-direction:column;gap:7px}
+  .qopt{text-align:left;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px 12px;font-size:13.5px;cursor:pointer;font-family:inherit}
+  .qopt:hover:not(:disabled){border-color:var(--accent)}
+  .qopt.ok{border-color:#12d6a5;background:rgba(18,214,165,.12)}
+  .qopt.ko{border-color:#ff4d6d;background:rgba(255,77,109,.12)}
+  .qopt:disabled{cursor:default}
+  .qexp{margin-top:10px;font-size:13px;color:var(--muted)}
+  .tldr{background:rgba(18,214,165,.08);border:1px solid rgba(18,214,165,.3);border-radius:12px;padding:12px 16px;margin:0 0 16px}
+  .tldr .tl{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--accent2);margin-bottom:6px}
+  .tldr ul{margin:0;padding-left:18px}.tldr li{margin:0 0 5px;font-size:14px;color:#cbd5ea}
+  .gl{border-bottom:1px dashed var(--accent2);cursor:pointer}
+  .glpop{position:fixed;z-index:80;max-width:290px;background:var(--card2);border:1px solid var(--accent2);border-radius:10px;padding:10px 13px;font-size:13px;line-height:1.5;color:var(--txt);box-shadow:0 10px 30px rgba(0,0,0,.5);display:none}
+  .glpop b{color:var(--accent2);text-transform:capitalize}
+  .podbar{position:fixed;left:0;right:0;bottom:0;z-index:65;background:var(--card2);border-top:1px solid var(--line);padding:10px 14px;display:none;align-items:center;gap:12px}
+  .podbar .pt{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .podbar button{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--accent2);color:var(--txt);padding:10px 16px;border-radius:10px;font-size:13px;z-index:90;display:none;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .archday{margin-bottom:16px}
+  .archdate{font-weight:700;font-size:14px;text-transform:capitalize;margin-bottom:6px;color:var(--accent2)}
+  .archlink{display:block;color:var(--txt);text-decoration:none;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .archlink span{color:var(--muted);font-size:12px}
+  :root[data-theme="light"]{--bg:#eef1f7;--card:#ffffff;--card2:#ffffff;--line:#dfe4ee;--txt:#1a2233;--muted:#5b6678;--shadow:0 6px 20px rgba(20,30,60,.08)}
+  :root[data-theme="light"] .tldr li,:root[data-theme="light"] .tip p{color:#33404f}
+  :root[data-theme="light"] .reader p{color:#2a3444}
+
+  .updatebar{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:linear-gradient(90deg,rgba(79,124,255,.18),rgba(18,214,165,.14));border:1px solid var(--accent);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13.5px}
+  .updatebar a{color:#fff;background:var(--accent);padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700}
+  .updatebar .uc{margin-left:auto;cursor:pointer;color:var(--muted);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="updatebar" id="updateBar"></div>
+  <header class="top">
+    <div class="brand">
+      <span class="kick"><span class="dot"></span> Édition du jour</span>
+      <h1>Tech &amp; Cyber Daily</h1>
+      <div class="sub" id="todaySub">—</div>
+    </div>
+    <div class="hbtns">
+      <button class="iconbtn" id="podBtn" title="Mode podcast">🎧</button><button class="iconbtn" id="ttsAllBtn" title="Écouter le résumé">🔊</button>
+      <button class="iconbtn" id="themeBtn" title="Thème clair/sombre">☀️</button><button class="iconbtn" id="archBtn" title="Archives">📚</button><button class="iconbtn" id="setBtn" title="Réglages">⚙️</button>
+    </div>
+  </header>
+
+  <div class="searchbar">
+    <input id="search" type="search" placeholder="🔍 Rechercher un article, un sujet, une source…" autocomplete="off">
+  </div>
+
+  <section class="tip">
+    <div class="lbl">💡 Astuce du jour</div>
+    <h2 id="tipTitle">—</h2>
+    <p id="tipText">—</p>
+  </section>
+
+  <section class="digest" id="digest" style="display:none">
+    <div class="lbl">📌 Les infos à retenir</div>
+    <ol id="digestList"></ol>
+  </section>
+
+  <div id="menace" class="menace"></div><section class="quiz" id="quiz"></section><div class="topics" id="topics"></div>
+
+  <div class="filters" id="filters">
+    <button class="chip active" data-cat="all">Tout</button>
+    <button class="chip" data-cat="cyber">🔒 Cyber</button>
+    <button class="chip" data-cat="tech">💻 Tech</button>
+    <button class="chip" data-cat="ia">🤖 IA</button>
+    <button class="chip" data-cat="hard">🔧 Hardware</button>
+    <button class="chip fav" data-cat="fav">❤️ Favoris</button>
+  </div>
+  <div class="count" id="count"></div>
+
+  <div class="grid" id="grid"></div>
+  <div class="status" id="status" style="display:none"></div>
+
+  <footer>Articles extraits des flux publics des médias — lecture sans publicité, news anglaises traduites.<br>Chaque article garde un lien vers sa source d’origine.<br><span style="opacity:.55">Tech &amp; Cyber Daily v1.0.0 · mise à jour automatique via GitHub</span></footer>
+</div>
+
+<div class="refreshbar"><button id="refreshBtn" title="Actualiser">⟳</button></div>
+
+<!-- Réglages -->
+<div class="modal" id="setModal">
+  <div class="sheet">
+    <h3>⚙️ Réglages</h3>
+    <div class="setrow"><span>Traduire les news anglaises en français</span><div class="toggle" id="tgTranslate"><div class="knob"></div></div></div>
+    <div class="setrow"><span>Regrouper les articles en double</span><div class="toggle" id="tgCluster"><div class="knob"></div></div></div>
+    <div class="setrow"><span>Taille du texte</span><div class="fsbtns"><button id="fsMinus">A−</button><button id="fsPlus">A+</button></div></div>
+    <div style="padding:11px 0 4px;font-size:14px">Sources actives <span style="color:var(--muted);font-size:12px">(touche pour activer/désactiver)</span></div>
+    <div class="srcgrid" id="srcGrid"></div>
+    <button class="closebtn" id="setClose">Terminé</button>
+  </div>
+</div>
+
+<div class="reader-backdrop" id="readerBackdrop"><div class="reader" id="reader"></div></div>
+<div id="glpop" class="glpop"></div>
+<div id="toast" class="toast"></div>
+<div class="podbar" id="podbar"><div class="pt"></div><button id="podStop">&#9209; Stop</button></div>
+<div class="modal" id="archModal"><div class="sheet"><h3>&#128218; Archives</h3><div id="archBody"></div><button class="closebtn" id="archClose">Fermer</button></div></div>
+
+<script>
+/* ================= Sources ================= */
+var FEEDS=[
+  {url:"https://www.zataz.com/feed/",name:"Zataz",cat:"cyber",lang:"fr"},
+  {url:"https://www.lemagit.fr/rss/ContentSyndication.xml",name:"LeMagIT",cat:"cyber",lang:"fr"},
+  {url:"https://www.lemondeinformatique.fr/flux-rss/thematique/securite/rss.xml",name:"Le Monde Info",cat:"cyber",lang:"fr"},
+  {url:"https://www.it-connect.fr/feed/",name:"IT-Connect",cat:"cyber",lang:"fr"},
+  {url:"https://www.undernews.fr/feed",name:"UnderNews",cat:"cyber",lang:"fr"},
+  {url:"https://feeds.feedburner.com/TheHackersNews",name:"The Hacker News",cat:"cyber",lang:"en"},
+  {url:"https://www.bleepingcomputer.com/feed/",name:"BleepingComputer",cat:"cyber",lang:"en"},
+  {url:"https://krebsonsecurity.com/feed/",name:"Krebs on Security",cat:"cyber",lang:"en"},
+  {url:"https://www.securityweek.com/feed/",name:"SecurityWeek",cat:"cyber",lang:"en"},
+  {url:"https://www.numerama.com/feed/",name:"Numerama",cat:"tech",lang:"fr"},
+  {url:"https://korben.info/feed",name:"Korben",cat:"tech",lang:"fr"},
+  {url:"https://www.01net.com/feed/",name:"01net",cat:"tech",lang:"fr"},
+  {url:"https://www.clubic.com/articles.rss",name:"Clubic",cat:"tech",lang:"fr"},
+  {url:"https://www.journaldugeek.com/feed/",name:"Journal du Geek",cat:"tech",lang:"fr"},
+  {url:"https://www.presse-citron.net/feed/",name:"Presse-citron",cat:"tech",lang:"fr"},
+  {url:"https://www.silicon.fr/feed",name:"Silicon",cat:"tech",lang:"fr"},
+  {url:"https://www.lesnumeriques.com/rss.xml",name:"Les Numériques",cat:"tech",lang:"fr"},
+  {url:"https://next.ink/feed/",name:"Next",cat:"tech",lang:"fr"},
+  {url:"https://linuxfr.org/news.atom",name:"LinuxFr",cat:"tech",lang:"fr"},
+  {url:"https://feeds.arstechnica.com/arstechnica/index",name:"Ars Technica",cat:"tech",lang:"en"},
+  {url:"https://www.theverge.com/rss/index.xml",name:"The Verge",cat:"tech",lang:"en"},
+  {url:"https://techcrunch.com/feed/",name:"TechCrunch",cat:"tech",lang:"en"},
+  {url:"https://www.actuia.com/feed/",name:"ActuIA",cat:"ia",lang:"fr"},
+  {url:"https://www.lebigdata.fr/feed",name:"LeBigData",cat:"ia",lang:"fr"},
+  {url:"https://www.frandroid.com/feed",name:"Frandroid",cat:"hard",lang:"fr"},
+  {url:"https://www.tomshardware.fr/feed/",name:"Tom's Hardware",cat:"hard",lang:"fr"},
+  {url:"https://www.phonandroid.com/feed",name:"Phonandroid",cat:"hard",lang:"fr"}
+];
+var CONTAINERS={
+  'thehackernews.com':'#articlebody','bleepingcomputer.com':'.articleBody','zataz.com':'.entry-content',
+  'lemagit.fr':'.content-body','lemondeinformatique.fr':'.article-body','numerama.com':'.article-content',
+  'korben.info':'.article-content','01net.com':'.entry-content','clubic.com':'.article-body',
+  'tomshardware.fr':'.article__content','actuia.com':'.artbody','frandroid.com':'.article-body',
+  'linuxfr.org':'.entry-content','arstechnica.com':'.post-content','lesnumeriques.com':'.entry-content',
+  'presse-citron.net':'.entry-content','theverge.com':'[class*="article-body"]','journaldugeek.com':'.article-content',
+  'it-connect.fr':'.entry-content','krebsonsecurity.com':'.entry-content','securityweek.com':'.article-content',
+  'silicon.fr':'.entry-content','next.ink':'.entry-content','lebigdata.fr':'.entry-content','phonandroid.com':'.entry-content'
+};
+var AD_SELECTORS='[class*="ad-"],[class*="-ad"],[class*="ads"],[class*="advert"],[class*="optidigital"],[class*="od-wrapper"],[class*="taboola"],[class*="outbrain"],[class*="mc4wp"],[class*="newsletter"],[class*="related"],[class*="share"],[class*="social"],[class*="sponsor"],[class*="promo"],[class*="interlude"],[class*="most-read"],[class*="most-popular"],[class*="partner"],[class*="affiliate"],[class*="paywall"],[class*="comment"],[id*="ad-"],[id*="ads"],[id*="taboola"],[id*="outbrain"],[data-testid*="ad"]';
+/* ================= Réglages / état persistant ================= */
+function lsGet(k,def){try{var v=localStorage.getItem(k);return v==null?def:JSON.parse(v);}catch(e){return def;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+var SETTINGS=lsGet('tcd_settings',{translate:true,cluster:true,fontScale:1,disabled:[]});
+var READ=lsGet('tcd_read',{});          // link -> 1
+var FAV=lsGet('tcd_fav',{});            // link -> snapshot
+var TOPICS=lsGet('tcd_topics',[]);      // ['ransomware', ...]
+document.documentElement.style.setProperty('--fs',SETTINGS.fontScale||1);
+/* ================= Filtres (repli sans accents) ================= */
+function fold(s){return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
+var BLOCK_LINK=['/bons-plans/','/bon-plan','/deals/','/promo','/coupon','/vroom/','/streaming/','/soldes'];
+var BLOCK_TITLE=['bon plan','bons plans','soldes','promo','reduction','remise','prix casse','moins cher','pas cher','meilleur prix','a prix','french days','black friday','prime day','cyber monday','ventes flash','vente flash','code promo','cashback','destockage','sans payer','en stock','trouver du stock','ou acheter','bon d achat','% de reduction','-20%','-30%','-40%','-50%','-60%','-70%','ou regarder','regarder le match','en direct hd','streaming gratuit','voir le match','coupe du monde','ligue des champions','ligue 1','en clair sur','diffusion tv','horoscope','guide d achat','meilleures offres','offre du jour','le deal ','les deals'];
+var TOPIC=['informatique','ordinateur','logiciel','application','appli','numerique','windows','microsoft','linux','ubuntu','macos','android','iphone','ipad','apple','smartphone','tablette','navigateur','chrome','firefox','safari','internet',' web','site web','en ligne','reseau','wifi','bluetooth','serveur','cloud','datacenter','fichier','systeme d','mise a jour',' update','objet connecte','domotique','processeur',' cpu ',' gpu','carte graphique','carte mere','nvidia','geforce','radeon',' amd ','intel','ryzen',' ram ','ddr','ssd','disque dur','stockage','puce','chipset','semi-conducteur','snapdragon','qualcomm',' usb','hdmi',' ecran','moniteur','clavier','souris','casque','peripherique','routeur','router','firmware','console','nintendo','xbox','playstation','steam ','manette','code source','coder','developpeur','developper','developpement','programmation','python','javascript',' java','rust','github','gitlab','open source','opensource',' api ','base de donnees','framework','algorithme','cyber','securite','security','piratage','pirate','pirater','hacker','hack','ransomware','rancongiciel','malware','logiciel malveillant','virus','trojan','faille','vulnerab','exploit','zero-day','0-day','phishing','hameconnage','fuite de donnees','data breach','leak','breach','backdoor','botnet','ddos','rgpd','gdpr','cnil','chiffrement','encryption','mot de passe','password','antivirus',' vpn','authentif','cve-','cybercrime','cyberattaque','spyware','deepfake','scam','intelligence artificielle','chatgpt','openai','gemini','mistral',' llm','gpt-','gpt4','gpt5',' claude ','copilot','anthropic','machine learning','deep learning','reseau de neurones','chatbot','ia generative','generative','modele de langage','google','meta ','tiktok','telegram','whatsapp',' signal','samsung','huawei','xiaomi','aws ','azure','cloudflare','wordpress','oracle','vmware','cisco','fortinet','quantique','blockchain','starlink'];
+var JUNK_PARA=['lire aussi','a lire egalement','a lire :','a lire aussi','sur le meme sujet','sur le meme theme','a decouvrir aussi','voir aussi :','dans la meme rubrique','notre dossier complet','notre comparatif','abonnez-vous','abonne-toi','inscrivez-vous a','notre newsletter','la newsletter','recevez chaque','recevez toute l actualite','recevez le meilleur','suivez-nous sur','suivez nous sur','rejoignez-nous','rejoignez notre','partagez cet article','partager sur','partager cet article','cliquez ici pour','laisser un commentaire','votre adresse e-mail','votre adresse email','pour aller plus loin','cet article vous a plu','soutenez-nous','faire un don','sur patreon','sur tipeee','en partenariat avec','article sponsorise','contenu sponsorise','politique de confidentialite','gerer mes cookies','accepter les cookies','tous droits reserves','credit photo','credits photo','telechargez l application','notre application','meilleurs vpn','notre guide d achat','code promo','read more:','also read:','you might also','you may also','related articles','related stories','related reading','recommended for you','sign up for','subscribe to','our newsletter','follow us on','share this article','leave a comment','all rights reserved','found this article interesting','advertisement','sponsored content','sponsored by','in partnership with','this article originally appeared','trending now','most popular','more from','join the conversation','click here to','continue reading'];
+var KW={
+  cyber:['cyber','piratage','pirate','hacker','hack','ransomware','rancongiciel','malware','virus','faille','vulnerab','phishing','hameconnage','fuite de donnees','data breach','breach','securite','cyberattaque','cnil','rgpd','exploit','zero-day','0-day','backdoor','botnet','ddos','vol de donnees','arnaque','escroquerie','espionnage'],
+  ia:['intelligence artificielle','chatgpt','openai','gemini','mistral',' llm','gpt-','claude','copilot','machine learning','deep learning','modele de langage','ia generative','anthropic','midjourney',' ia '],
+  hard:['processeur',' cpu',' gpu','carte graphique','carte mere','nvidia',' amd ','intel','smartphone',' ram ','ddr',' ssd','pc portable','batterie','snapdragon','apple silicon','overclock','ecran oled']
+};
+function isJunk(title,link){
+  var t=fold(title),l=(link||'').toLowerCase();
+  for(var i=0;i<BLOCK_LINK.length;i++) if(l.indexOf(BLOCK_LINK[i])>=0) return true;
+  for(var j=0;j<BLOCK_TITLE.length;j++) if(t.indexOf(BLOCK_TITLE[j])>=0) return true;
+  return false;
+}
+function isRelevant(title,excerpt){
+  var t=' '+fold(title+' '+excerpt)+' ';
+  for(var i=0;i<TOPIC.length;i++) if(t.indexOf(TOPIC[i])>=0) return true;
+  return false;
+}
+function isJunkPara(txt){
+  var t=fold(txt);
+  for(var i=0;i<JUNK_PARA.length;i++) if(t.indexOf(JUNK_PARA[i])>=0) return true;
+  return false;
+}
+function getCat(base,text){
+  var t=fold(text),order=['cyber','ia','hard'];
+  for(var o=0;o<order.length;o++){var ws=KW[order[o]];for(var i=0;i<ws.length;i++) if(t.indexOf(ws[i])>=0) return order[o];}
+  return base;
+}
+/* ================= Pont natif ================= */
+var PENDING={},FID=1;
+function bridgeFetch(url){
+  return new Promise(function(res){
+    if(window.AndroidBridge&&AndroidBridge.fetchUrl){
+      var id=FID++;
+      PENDING[id]={res:res,timer:setTimeout(function(){delete PENDING[id];res('');},16000)};
+      AndroidBridge.fetchUrl(url,id);
+    } else { fetch(url).then(function(r){return r.text();}).then(res).catch(function(){res('');}); }
+  });
+}
+function onFetchDone(id,b64){
+  var p=PENDING[id];if(!p)return;
+  clearTimeout(p.timer);delete PENDING[id];
+  try{var bin=atob(b64),arr=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);p.res(new TextDecoder('utf-8').decode(arr));}catch(e){p.res('');}
+}
+/* ================= Traduction ================= */
+function gtxUrl(q){return 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=fr&dt=t&q='+encodeURIComponent(q);}
+function translateChunk(arr){
+  if(!arr.length) return Promise.resolve([]);
+  return bridgeFetch(gtxUrl(arr.join('\n[[[0]]]\n'))).then(function(raw){
+    try{var j=JSON.parse(raw);var out=j[0].map(function(s){return s[0];}).join('');var parts=out.split(/\[\[\[0\]\]\]/);if(parts.length===arr.length) return parts.map(function(x){return x.trim();});return arr;}catch(e){ return arr; }
+  });
+}
+function translateTexts(texts){
+  var chunks=[],cur=[],len=0;
+  texts.forEach(function(t){t=(t==null)?'':String(t);if(len>0&&len+t.length>1500){chunks.push(cur);cur=[];len=0;}cur.push(t);len+=t.length+12;});
+  if(cur.length) chunks.push(cur);
+  var result=[];
+  return chunks.reduce(function(pr,ch){return pr.then(function(){return translateChunk(ch);}).then(function(tr){result=result.concat(tr);});},Promise.resolve()).then(function(){return result;});
+}
+/* ================= Synthèse vocale ================= */
+var speaking=false;
+function speak(text){
+  stopSpeak();
+  if(window.AndroidBridge&&AndroidBridge.speak){AndroidBridge.speak(text);speaking=true;return;}
+  if(window.speechSynthesis){
+    var u=new SpeechSynthesisUtterance(text);u.lang='fr-FR';u.rate=1;
+    u.onend=function(){speaking=false;syncTtsBtns();};
+    speechSynthesis.speak(u);speaking=true;
+  }
+}
+function stopSpeak(){
+  if(window.AndroidBridge&&AndroidBridge.stopSpeak){AndroidBridge.stopSpeak();}
+  if(window.speechSynthesis){speechSynthesis.cancel();}
+  speaking=false;syncTtsBtns();
+}
+function syncTtsBtns(){
+  var b=document.getElementById('ttsAllBtn');if(b)b.classList.toggle('on',speaking);
+  var rb=document.getElementById('rTts');if(rb)rb.classList.toggle('on',speaking);
+}
+/* ================= Astuce du jour ================= */
+var TIPS=[
+  {t:"Active la double authentification partout",x:"La 2FA (code généré par une appli comme Authy ou Google Authenticator) bloque la quasi-totalité des piratages de compte, même si ton mot de passe fuite. Commence par ta boîte mail : c’est la clé de tous tes autres comptes."},
+  {t:"Un gestionnaire de mots de passe change la vie",x:"Bitwarden ou KeePass génèrent et retiennent un mot de passe unique pour chaque site. Tu n’as qu’un seul mot de passe maître à mémoriser, et plus aucun effet domino en cas de fuite."},
+  {t:"Méfie-toi des liens dans les mails, même « officiels »",x:"Le phishing imite ta banque, Amazon ou les impôts. Avant de cliquer, regarde la vraie adresse du lien. En cas de doute, va sur le site en tapant l’adresse toi-même."},
+  {t:"Mets à jour… vraiment tout",x:"Android, navigateur, applis, box internet. La plupart des piratages exploitent une faille déjà corrigée par une mise à jour que la victime n’avait pas installée."},
+  {t:"Ne branche jamais une clé USB inconnue",x:"Une clé trouvée sur un parking est un grand classique d’attaque : elle peut exécuter un programme malveillant dès l’insertion. Dans le doute, jette-la."},
+  {t:"Sauvegarde selon la règle 3-2-1",x:"3 copies de tes données, sur 2 supports différents, dont 1 hors ligne. C’est ta seule vraie protection contre les rançongiciels."},
+  {t:"Sur le Wi-Fi public, utilise un VPN",x:"Dans un café ou un aéroport, quelqu’un peut intercepter ton trafic. Un VPN chiffre tout. À défaut, évite de te connecter à ta banque sur ces réseaux."},
+  {t:"Vérifie si tes comptes ont fuité",x:"Le site haveibeenpwned.com te dit gratuitement si ton email apparaît dans une fuite de données connue. Si oui : change immédiatement le mot de passe concerné."},
+  {t:"Un mot de passe long bat un mot de passe compliqué",x:"« cheval-orange-tempête-42 » est plus solide et plus facile à retenir que « Xk7!p ». La longueur est ce qui compte le plus contre la force brute."},
+  {t:"Ne réutilise jamais le même mot de passe",x:"Si un site est piraté, les attaquants testent ton couple email/mot de passe partout ailleurs. Un mot de passe unique par site coupe la réaction en chaîne."},
+  {t:"Attention aux QR codes en pleine rue",x:"Le « quishing » : un QR code collé sur un parcmètre ou une terrasse peut rediriger vers un faux site de paiement. Vérifie toujours l’adresse qui s’affiche."},
+  {t:"Regarde les autorisations de tes applis",x:"Pourquoi une lampe torche demande-t-elle l’accès à tes contacts et ta position ? Retire les permissions abusives dans les réglages du téléphone."},
+  {t:"Chiffre ton téléphone et mets un code solide",x:"Un code à 6 chiffres minimum (ou biométrie). Si ton téléphone est volé, tes données restent illisibles."},
+  {t:"Méfie-toi des offres trop belles",x:"iPhone à 200 €, crypto qui double en une semaine, colis à réclamer… Si c’est trop beau, c’est une arnaque. Prends toujours le temps de vérifier."},
+  {t:"N’installe des APK que de sources sûres",x:"En dehors du Play Store, un APK peut contenir n’importe quoi. N’installe que ce que tu as vérifié toi-même, et refuse les APK envoyés par message."}
+];
+(function(){
+  var start=new Date(new Date().getFullYear(),0,0);
+  var day=Math.floor((new Date()-start)/86400000);
+  var tip=TIPS[day%TIPS.length];
+  document.getElementById('tipTitle').textContent=tip.t;
+  document.getElementById('tipText').textContent=tip.x;
+  document.getElementById('todaySub').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+})();
+/* ================= Modèle / rendu ================= */
+var ALL=[],CURRENT='all',QUERY='';
+var CAT_LABEL={cyber:"Cyber",ia:"IA",tech:"Tech",hard:"Hardware"};
+var CAT_ICON={cyber:"🔒",ia:"🤖",tech:"💻",hard:"🔧"};
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function timeAgo(iso){
+  if(!iso)return"";var d=new Date(iso);if(isNaN(d))return"";
+  var s=(Date.now()-d.getTime())/1000;
+  if(s<3600)return"il y a "+Math.max(1,Math.round(s/60))+" min";
+  if(s<86400)return"il y a "+Math.round(s/3600)+" h";
+  var days=Math.round(s/86400);return days<=1?"hier":"il y a "+days+" j";
+}
+function readMins(a){
+  if(a.mins)return a.mins;
+  var w=0;
+  if(a.blocks&&a.blocks.length){a.blocks.forEach(function(b){if(b.t!=='img')w+=b.v.split(/\s+/).length;});}
+  else{var base=(a._plain||a.excerpt||'');w=base.split(/\s+/).length*(a._plain?1:4);}
+  a.mins=Math.max(1,Math.round(w/200));
+  return a.mins;
+}
+function matchesTopics(a){
+  if(!TOPICS.length)return false;
+  var t=fold(a.title+' '+a.excerpt);
+  for(var i=0;i<TOPICS.length;i++){if(t.indexOf(fold(TOPICS[i]))>=0)return true;}
+  return false;
+}
+function highlight(html,text){
+  if(!TOPICS.length)return html;
+  var out=text;
+  return html; // (le surlignage se fait sur le texte échappé, voir markText)
+}
+function markText(txt){
+  var safe=esc(txt);
+  if(!TOPICS.length)return safe;
+  TOPICS.forEach(function(kw){
+    if(!kw)return;
+    var re=new RegExp('('+kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    safe=safe.replace(re,'<mark>$1</mark>');
+  });
+  return safe;
+}
+var tagNS=function(el,local){var list=el.getElementsByTagName('*');for(var i=0;i<list.length;i++){if(list[i].localName===local)return list[i];}return null;};
+function parseFeed(xml,feed){
+  var out=[];var doc;
+  try{doc=new DOMParser().parseFromString(xml,'text/xml');}catch(e){return out;}
+  if(!doc||doc.querySelector('parsererror'))return out;
+  var items=doc.getElementsByTagName('item');if(!items.length)items=doc.getElementsByTagName('entry');
+  for(var i=0;i<items.length&&out.length<12;i++){
+    var it=items[i];
+    var tEl=it.getElementsByTagName('title')[0];
+    var title=tEl?tEl.textContent.replace(/\s+/g,' ').trim():'';
+    if(!title)continue;
+    var link='';var lEl=it.getElementsByTagName('link')[0];
+    if(lEl){link=(lEl.textContent||'').trim()||lEl.getAttribute('href')||'';}
+    if(!/^https?:\/\//.test(link))continue;
+    if(isJunk(title,link))continue;
+    var dEl=it.getElementsByTagName('description')[0]||tagNS(it,'summary');
+    var rawDesc=dEl?dEl.textContent:'';
+    var encEl=tagNS(it,'encoded');var rawFull=encEl?encEl.textContent:rawDesc;
+    var tmp=document.createElement('div');tmp.innerHTML=rawDesc;
+    var excerptFull=(tmp.textContent||'').replace(/\s+/g,' ').trim();
+    var excerpt=excerptFull.slice(0,180);
+    if(!isRelevant(title,excerptFull))continue;
+    var img='';var media=it.getElementsByTagName('*');
+    for(var m=0;m<media.length;m++){var el=media[m];
+      if((el.localName==='content'||el.localName==='thumbnail')&&el.getAttribute&&el.getAttribute('url')){img=el.getAttribute('url');break;}
+      if(el.localName==='enclosure'&&el.getAttribute('url')&&/image|\.(jpg|jpeg|png|webp)/i.test((el.getAttribute('type')||'')+el.getAttribute('url'))){img=el.getAttribute('url');break;}
+    }
+    if(!img){var im=(rawFull||'').match(/<img[^>]+src=["']([^"']+)["']/i);if(im)img=im[1];}
+    if(img&&img.indexOf('//')===0)img='https:'+img;
+    if(!/^https?:\/\//.test(img||''))img='';
+    var dateStr='';var pd=it.getElementsByTagName('pubDate')[0]||tagNS(it,'date')||it.getElementsByTagName('published')[0]||it.getElementsByTagName('updated')[0];
+    if(pd)dateStr=pd.textContent.trim();
+    var dt=dateStr?new Date(dateStr):null;
+    var plain=(function(){var d=document.createElement('div');d.innerHTML=rawFull||'';return (d.textContent||'').replace(/\s+/g,' ').trim();})();
+    out.push({title:title,link:link,excerpt:excerpt,img:img,source:feed.name,cat:getCat(feed.cat,title+' '+excerptFull),date:(dt&&!isNaN(dt))?dt.toISOString():'',rawFull:rawFull||'',_plain:plain,blocks:null,lang:feed.lang,translated:false,bodyTranslated:false,related:null});
+  }
+  return out;
+}
+/* ---- extraction corps ---- */
+function absUrl(u,base){if(!u)return'';if(/^https?:\/\//.test(u))return u;if(u.indexOf('//')===0)return'https:'+u;if(u.charAt(0)==='/'){var m=base.match(/^(https?:\/\/[^\/]+)/);if(m)return m[1]+u;}return'';}
+function ogImage(html){
+  if(!html)return'';
+  var m=html.match(/<meta[^>]+property\s*=\s*["']og:image(?::url)?["'][^>]*content\s*=\s*["']([^"']+)["']/i)||html.match(/<meta[^>]+content\s*=\s*["']([^"']+)["'][^>]*property\s*=\s*["']og:image["']/i)||html.match(/<meta[^>]+name\s*=\s*["']twitter:image["'][^>]*content\s*=\s*["']([^"']+)["']/i);
+  if(m&&m[1]){var u=m[1].trim().replace(/&amp;/g,'&');if(u.indexOf('//')===0)u='https:'+u;if(/^https?:\/\//.test(u)&&!/\.svg/i.test(u))return u;}
+  return'';
+}
+function blocksFromRoot(root,baseLink){
+  var out=[],nText=0,nImg=0;
+  var junk=root.querySelectorAll('script,style,aside,nav,footer,form,figcaption,button,svg,'+AD_SELECTORS);
+  for(var i=0;i<junk.length;i++){try{junk[i].parentNode.removeChild(junk[i]);}catch(e){}}
+  var nodes=root.querySelectorAll('p,h2,h3,li,img');
+  for(var k=0;k<nodes.length;k++){
+    var el=nodes[k];
+    if(el.tagName==='IMG'){
+      if(nImg>=8)continue;
+      var cls=(el.getAttribute('class')||'').toLowerCase();
+      if(/attachment-thumbnail|attachment-medium|wp-post-image/.test(cls))continue;
+      var src=el.getAttribute('data-lazy-src')||el.getAttribute('data-src')||el.getAttribute('data-original')||el.getAttribute('src')||'';src=src.trim();
+      if(src.indexOf('data:')===0)continue;
+      src=absUrl(src,baseLink);if(!src)continue;
+      if(/logo|icon|avatar|badge|pixel|1x1|150x150|emoji|smiley|gravatar|feedburner|doubleclick|\/ads\/|\/ad\/|adservice|taboola|outbrain|optidigital|criteo|banner|sponsor|captcha|\.svg|tracking|beacon|bleepstatic\.com\/c\/|\/promoted\/|\/sponsored\//i.test(src))continue;
+      var dup=false;for(var d=0;d<out.length;d++){if(out[d].t==='img'&&out[d].v===src){dup=true;break;}}
+      if(dup)continue;out.push({t:'img',v:src});nImg++;
+    } else {
+      if(nText>=40)continue;
+      if(el.tagName==='LI'&&el.querySelector('p'))continue;
+      var txt=(el.textContent||'').replace(/\s+/g,' ').trim();
+      if(el.tagName==='H2'||el.tagName==='H3'){if(txt.length>=8&&txt.length<=200&&!isJunkPara(txt)){out.push({t:'h',v:txt});nText++;}}
+      else{var linkOnly=(el.querySelector('a')&&txt.length<130);if(txt.length>=60&&!linkOnly&&!isJunkPara(txt)){out.push({t:'p',v:txt});nText++;}}
+    }
+  }
+  return out;
+}
+function extractFromPage(html,link){
+  var doc;try{doc=new DOMParser().parseFromString(html,'text/html');}catch(e){return[];}
+  if(!doc||!doc.body)return[];
+  var host=(link.match(/^https?:\/\/([^\/]+)/)||[])[1]||'';
+  var root=null;
+  for(var k in CONTAINERS){if(host.indexOf(k)>=0){try{root=doc.querySelector(CONTAINERS[k]);}catch(e){}break;}}
+  if(!root){var arts=doc.querySelectorAll('article');var best=null,bl=0;for(var i=0;i<arts.length;i++){var L=(arts[i].textContent||'').length;if(L>bl){bl=L;best=arts[i];}}if(best&&bl>1500)root=best;}
+  if(!root)root=doc.querySelector('.entry-content,.article-content,.post-content,.article-body,.post-body')||doc.body;
+  return blocksFromRoot(root,link);
+}
+/* ---- regroupement des doublons ---- */
+function titleTokens(t){var f=fold(t).replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(function(w){return w.length>3;});var s={};f.forEach(function(w){s[w]=1;});return Object.keys(s);}
+function jaccard(a,b){if(!a.length||!b.length)return 0;var setb={};b.forEach(function(w){setb[w]=1;});var inter=0;a.forEach(function(w){if(setb[w])inter++;});return inter/(a.length+b.length-inter);}
+function cluster(list){
+  if(!SETTINGS.cluster)return list;
+  var used=[];var toks=list.map(function(a){return titleTokens(a.title);});
+  for(var i=0;i<list.length;i++){
+    if(used[i])continue;list[i].related=[];
+    for(var j=i+1;j<list.length;j++){
+      if(used[j]||list[i].source===list[j].source)continue;
+      if(jaccard(toks[i],toks[j])>=0.55){list[i].related.push({source:list[j].source,link:list[j].link});used[j]=true;}
+    }
+  }
+  return list.filter(function(a,i){return !used[i];});
+}
+/* ================= Rendu ================= */
+var grid=document.getElementById('grid'),statusEl=document.getElementById('status');
+function visibleList(){
+  var list;
+  if(CURRENT==='fav'){list=Object.keys(FAV).map(function(k){return FAV[k];});}
+  else {list=ALL.filter(function(a){return CURRENT==='all'||a.cat===CURRENT;});}
+  if(QUERY){var q=fold(QUERY);list=list.filter(function(a){return fold(a.title+' '+a.excerpt+' '+a.source).indexOf(q)>=0;});}
+  // épingle les sujets suivis en tête (tri stable)
+  if(CURRENT!=='fav'){
+    var dec=list.map(function(a,i){return {a:a,i:i,p:(TOPICS.length&&matchesTopics(a))?1:0,s:severityOf(a),b:sourceBoost(a)};});
+    dec.sort(function(x,y){return (y.p-x.p)||(y.s-x.s)||(y.b-x.b)||(x.i-y.i);});
+    list=dec.map(function(o){return o.a;});
+  }
+  updateMenace();
+  return list;
+}
+function cardHtml(a){
+  var b=a.cat||'tech';
+  var isFav=!!FAV[a.link],isRead=!!READ[a.link],isPin=(TOPICS.length&&matchesTopics(a)&&CURRENT!=='fav');var sv=severityOf(a);
+  var thumb=a.img?"<img src='"+esc(a.img)+"' loading='lazy' referrerpolicy='no-referrer' alt='' onerror=\"this.parentNode.innerHTML='<div class=\\'noimg\\'>"+(CAT_ICON[b]||'')+"</div>'\">":"<div class='noimg'>"+(CAT_ICON[b]||'')+"</div>";
+  var tr=a.translated?"<span class='tr'>🌐 traduit</span>":"";
+  var rel=(a.related&&a.related.length)?"<span class='relnote'>+ "+a.related.length+" source"+(a.related.length>1?'s':'')+"</span>":"";
+  return "<a class='card"+(isRead?' read':'')+(isPin?' pin':'')+(sv===2?' crit':'')+"' data-link='"+esc(a.link)+"'>"+
+    "<div class='thumb'><span class='badge b-"+b+"'>"+(CAT_LABEL[b]||'News')+"</span>"+thumb+
+      "<button class='heart"+(isFav?' on':'')+"' data-fav='"+esc(a.link)+"'>"+(isFav?'♥':'♡')+"</button>"+
+      (isPin?"<span class='pinstar'>⭐</span>":"")+"</div>"+
+    "<div class='body'><div class='src'><span class='name'>"+(sv===2?"<span class='alertpill'>🔴 Alerte</span>":"")+esc(a.source)+tr+"</span><span class='meta'>"+readMins(a)+" min · "+timeAgo(a.date)+"</span></div>"+
+    "<h3>"+markText(a.title)+"</h3><p class='excerpt'>"+esc(a.excerpt)+(a.excerpt&&a.excerpt.length>=180?'…':'')+"</p>"+
+    "<div class='src'>"+rel+"<span class='go'>Lire ici →</span></div></div></a>";
+}
+function render(){
+  var list=visibleList();
+  document.getElementById('count').textContent=list.length+' article'+(list.length>1?'s':'')+(CURRENT==='fav'?' en favori':'');
+  if(!list.length){
+    grid.innerHTML='';statusEl.style.display='block';
+    statusEl.innerHTML=CURRENT==='fav'?"<div class='big'>Aucun favori</div><div>Touche le ♡ d’un article pour le sauvegarder.</div>":(ALL.length?"<div class='big'>Aucun article</div><div>Essaie une autre rubrique ou recherche.</div>":"<div class='big'>Aucune news chargée</div><div>Vérifie ta connexion puis appuie sur ⟳</div>");
+    return;
+  }
+  statusEl.style.display='none';
+  grid.innerHTML=list.map(cardHtml).join('');
+}
+function renderDigest(){
+  var d=document.getElementById('digest'),ol=document.getElementById('digestList');
+  if(!ALL.length){d.style.display='none';return;}
+  var top=ALL.slice(0,3);
+  ol.innerHTML=top.map(function(a){return "<li data-link='"+esc(a.link)+"'><b>"+esc(a.title)+"</b> <span>— "+esc(a.source)+"</span></li>";}).join('');
+  d.style.display='block';
+}
+function renderTopics(){
+  var el=document.getElementById('topics');
+  var h="<span class='tlab'>Sujets suivis :</span>";
+  TOPICS.forEach(function(kw){h+="<span class='topic'>"+esc(kw)+"<b data-deltopic='"+esc(kw)+"'>✕</b></span>";});
+  h+="<span class='topic-add' id='addTopic'>+ suivre un sujet</span>";
+  el.innerHTML=h;
+}
+function showSkeletons(){
+  statusEl.style.display='none';
+  grid.innerHTML=Array.apply(null,Array(4)).map(function(){return "<div class='skeleton'><div class='sk img'></div><div class='sk line'></div><div class='sk line'></div><div class='sk line s'></div></div>";}).join('');
+}
+/* ================= Lecture intégrée ================= */
+var backdrop=document.getElementById('readerBackdrop'),readerEl=document.getElementById('reader');
+var readerOpen=false,readerCur=null;
+function baseU(u){return(u||'').split('?')[0].replace(/-\d+x\d+(\.\w+)$/,'$1');}
+function findByLink(link){for(var i=0;i<ALL.length;i++){if(ALL[i].link===link)return ALL[i];}if(FAV[link])return FAV[link];return null;}
+function renderReader(a){
+  var isFav=!!FAV[a.link];
+  var h='<div class="rbar"><button class="rbtn" onclick="closeReader()">✕</button><div class="rgroup">'+
+    '<button class="rbtn'+(speaking?' on':'')+'" id="rTts" onclick="toggleReadAloud()">🔊</button>'+
+    '<button class="rbtn" onclick="shareArticle(readerCur)" title="Partager">↗</button>'+'<button class="rbtn" onclick="voteSource(readerCur.source,1);toast(\'Plus de \'+readerCur.source)" title="Plus de cette source">👍</button>'+'<button class="rbtn" onclick="voteSource(readerCur.source,-1);toast(\'Moins de \'+readerCur.source)" title="Moins de cette source">👎</button>'+'<button class="rbtn fav'+(isFav?' on':'')+'" onclick="toggleFav(readerCur)">'+(isFav?'♥':'♡')+'</button></div></div>';
+  h+='<div class="rmeta"><span class="badge b-'+(a.cat||'tech')+'">'+(CAT_LABEL[a.cat]||'News')+'</span><span class="rsrc">'+esc(a.source)+'</span><span>'+timeAgo(a.date)+'</span>'+(a.translated?'<span class="tr">🌐 traduit</span>':'')+'</div>';
+  h+='<h2 class="rtitle">'+markText(a.title)+'</h2>';
+  h+='<div class="rtime">⏱ '+readMins(a)+' min de lecture</div>';
+  if(a.img)h+='<img src="'+esc(a.img)+'" referrerpolicy="no-referrer" onerror="this.remove()">';
+  var seen=[baseU(a.img)];
+  if(a.blocks&&a.blocks.length){
+    a.blocks.forEach(function(bk){
+      if(bk.t==='img'){var kk=baseU(bk.v);if(seen.indexOf(kk)===-1){seen.push(kk);h+='<img src="'+esc(bk.v)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">';}}
+      else if(bk.t==='h'){h+='<h3>'+markText(bk.v)+'</h3>';}
+      else{h+='<p>'+markText(bk.v)+'</p>';}
+    });
+    if(a.lang==='en'&&!a.bodyTranslated){h+='<div class="rload">Traduction en cours…</div>';}
+  } else if(a.blocks!==null){
+    h+='<p>'+esc(a.excerpt)+'…</p><p class="rnote">Le contenu complet n’a pas pu être extrait — ouvre l’article sur le site d’origine ci-dessous.</p>';
+  } else { h+='<div class="rload">Chargement de l’article…</div>'; }
+  if(a.related&&a.related.length){
+    h+='<div class="rrelated"><div class="rl">Aussi couvert par</div>';
+    a.related.forEach(function(r){h+='<a href="'+esc(r.link)+'" target="_blank">'+esc(r.source)+' ↗</a>';});
+    h+='</div>';
+  }
+  h+='<br><a class="rsource" href="'+esc(a.link)+'" target="_blank">Source : '+esc(a.source)+' ↗</a>';
+  readerEl.innerHTML=h;enhanceReader();
+}
+function translateBody(a,done){
+  if(a.lang!=='en'||a.bodyTranslated||!a.blocks||!a.blocks.length){done();return;}
+  var idx=[],texts=[];a.blocks.forEach(function(b,i){if(b.t!=='img'){idx.push(i);texts.push(b.v);}});
+  if(!texts.length){a.bodyTranslated=true;done();return;}
+  translateTexts(texts).then(function(tr){for(var m=0;m<idx.length&&m<tr.length;m++){a.blocks[idx[m]].v=tr[m];}a.bodyTranslated=true;a.translated=true;done();});
+}
+function openReaderLink(link){
+  var a=findByLink(link);if(!a)return;
+  readerOpen=true;readerCur=a;
+  if(!READ[a.link]){READ[a.link]=1;lsSet('tcd_read',READ);}
+  backdrop.style.display='block';document.body.style.overflow='hidden';backdrop.scrollTop=0;
+  renderReader(a);
+  var afterBody=function(){if(readerCur!==a)return;translateBody(a,function(){if(readerCur===a){renderReader(a);a.mins=0;readMins(a);}});};
+  if(a.blocks){afterBody();return;}
+  if(a.rawFull){var tmp=document.createElement('div');tmp.innerHTML=a.rawFull;if((tmp.textContent||'').length>600){var bl=blocksFromRoot(tmp,a.link);if(bl.length>=3){a.blocks=bl;a.mins=0;renderReader(a);afterBody();return;}}}
+  bridgeFetch(a.link).then(function(html){if(readerCur!==a)return;a.blocks=html?extractFromPage(html,a.link):[];a.mins=0;renderReader(a);afterBody();});
+}
+function closeReader(){readerOpen=false;readerCur=null;stopSpeak();backdrop.style.display='none';document.body.style.overflow='';render();}
+function appBack(){if(document.getElementById('setModal').classList.contains('open')){closeSettings();return'closed';}if(readerOpen){closeReader();return'closed';}return'exit';}
+function toggleReadAloud(){
+  if(speaking){stopSpeak();return;}
+  var a=readerCur;if(!a)return;
+  var parts=[a.title];
+  if(a.blocks)a.blocks.forEach(function(b){if(b.t!=='img')parts.push(b.v);});
+  else parts.push(a.excerpt);
+  speak(parts.join('. '));syncTtsBtns();
+}
+/* ================= Favoris / sujets ================= */
+function snapshot(a){return{title:a.title,link:a.link,excerpt:a.excerpt,img:a.img,source:a.source,cat:a.cat,date:a.date,lang:a.lang,translated:a.translated,blocks:a.bodyTranslated?a.blocks:null,bodyTranslated:a.bodyTranslated,rawFull:'',related:a.related||null,mins:a.mins||0,_plain:a._plain||''};}
+function toggleFav(a){
+  if(!a)return;
+  if(FAV[a.link])delete FAV[a.link];else FAV[a.link]=snapshot(a);
+  lsSet('tcd_fav',FAV);
+  if(readerOpen&&readerCur===a)renderReader(a);
+  render();
+}
+function addTopic(){
+  var kw=prompt('Suivre un sujet (ex : ransomware, iPhone, IA) :');
+  if(kw==null)return;kw=kw.trim();if(!kw)return;
+  if(TOPICS.map(function(x){return x.toLowerCase();}).indexOf(kw.toLowerCase())<0){TOPICS.push(kw);lsSet('tcd_topics',TOPICS);}
+  renderTopics();render();
+}
+function delTopic(kw){TOPICS=TOPICS.filter(function(x){return x!==kw;});lsSet('tcd_topics',TOPICS);renderTopics();render();}
+/* ================= Réglages ================= */
+function openSettings(){
+  document.getElementById('tgTranslate').classList.toggle('on',SETTINGS.translate);
+  document.getElementById('tgCluster').classList.toggle('on',SETTINGS.cluster);
+  var g=document.getElementById('srcGrid');
+  g.innerHTML=FEEDS.map(function(f){var on=SETTINGS.disabled.indexOf(f.name)<0;return "<span class='srctag"+(on?' on':'')+"' data-src='"+esc(f.name)+"'>"+esc(f.name)+"</span>";}).join('');
+  document.getElementById('setModal').classList.add('open');
+}
+function closeSettings(){document.getElementById('setModal').classList.remove('open');}
+/* ================= Événements ================= */
+document.getElementById('search').addEventListener('input',function(e){QUERY=e.target.value;render();});
+document.getElementById('filters').addEventListener('click',function(e){
+  var c=e.target.closest('.chip');if(!c)return;
+  var chips=document.querySelectorAll('.chip');for(var i=0;i<chips.length;i++)chips[i].classList.remove('active');
+  c.classList.add('active');CURRENT=c.dataset.cat;render();
+});
+grid.addEventListener('click',function(e){
+  var fav=e.target.closest('.heart');
+  if(fav){e.preventDefault();e.stopPropagation();toggleFav(findByLink(fav.getAttribute('data-fav')));return;}
+  var card=e.target.closest('a.card');if(!card)return;e.preventDefault();openReaderLink(card.getAttribute('data-link'));
+});
+document.getElementById('digest').addEventListener('click',function(e){var li=e.target.closest('li');if(li)openReaderLink(li.getAttribute('data-link'));});
+document.getElementById('topics').addEventListener('click',function(e){
+  if(e.target.id==='addTopic'){addTopic();return;}
+  var del=e.target.getAttribute('data-deltopic');if(del)delTopic(del);
+});
+document.getElementById('setBtn').addEventListener('click',openSettings);
+document.getElementById('setClose').addEventListener('click',closeSettings);
+document.getElementById('setModal').addEventListener('click',function(e){if(e.target.id==='setModal')closeSettings();});
+document.getElementById('tgTranslate').addEventListener('click',function(){SETTINGS.translate=!SETTINGS.translate;lsSet('tcd_settings',SETTINGS);this.classList.toggle('on',SETTINGS.translate);});
+document.getElementById('tgCluster').addEventListener('click',function(){SETTINGS.cluster=!SETTINGS.cluster;lsSet('tcd_settings',SETTINGS);this.classList.toggle('on',SETTINGS.cluster);});
+document.getElementById('fsPlus').addEventListener('click',function(){SETTINGS.fontScale=Math.min(1.4,(SETTINGS.fontScale||1)+0.1);applyFont();});
+document.getElementById('fsMinus').addEventListener('click',function(){SETTINGS.fontScale=Math.max(0.85,(SETTINGS.fontScale||1)-0.1);applyFont();});
+function applyFont(){document.documentElement.style.setProperty('--fs',SETTINGS.fontScale);lsSet('tcd_settings',SETTINGS);}
+document.getElementById('srcGrid').addEventListener('click',function(e){
+  var t=e.target.closest('.srctag');if(!t)return;
+  var name=t.getAttribute('data-src');var i=SETTINGS.disabled.indexOf(name);
+  if(i<0)SETTINGS.disabled.push(name);else SETTINGS.disabled.splice(i,1);
+  lsSet('tcd_settings',SETTINGS);t.classList.toggle('on',SETTINGS.disabled.indexOf(name)<0);
+});
+document.getElementById('ttsAllBtn').addEventListener('click',function(){
+  if(speaking){stopSpeak();return;}
+  var top=ALL.slice(0,5);if(!top.length)return;
+  var txt='Voici les infos à retenir. '+top.map(function(a,i){return (i+1)+'. '+a.title+'.';}).join(' ');
+  speak(txt);syncTtsBtns();
+});
+document.getElementById('refreshBtn').addEventListener('click',load);
+/* ================= Chargement ================= */
+function normalize(items){
+  var seen={},out=[];
+  items.forEach(function(a){var k=a.title.toLowerCase();if(seen[k])return;seen[k]=1;out.push(a);});
+  out.sort(function(x,y){var tx=x.date?new Date(x.date).getTime():0,ty=y.date?new Date(y.date).getTime():0;return ty-tx;});
+  out=cluster(out);
+  out=out.slice(0,60);
+  return out;
+}
+function afterData(){render();renderDigest();saveHistory();}
+function translateCards(){
+  if(!SETTINGS.translate)return;
+  var en=ALL.filter(function(a){return a.lang==='en'&&!a.translated;});
+  if(!en.length)return;
+  var texts=[];en.forEach(function(a){texts.push(a.title);texts.push(a.excerpt);});
+  translateTexts(texts).then(function(tr){en.forEach(function(a,i){if(tr[i*2]!==undefined&&tr[i*2]){a.title=tr[i*2];a.excerpt=tr[i*2+1]||a.excerpt;a.translated=true;}});afterData();saveCache();});
+}
+function fillMissingImages(){
+  var miss=ALL.filter(function(a){return !a.img;});if(!miss.length)return;
+  var ps=miss.map(function(a){return bridgeFetch(a.link).then(function(html){if(!html)return;var u=ogImage(html);if(!u){var bl=extractFromPage(html,a.link);for(var i=0;i<bl.length;i++){if(bl[i].t==='img'){u=bl[i].v;break;}}}if(u)a.img=u;}).catch(function(){});});
+  Promise.all(ps).then(function(){render();saveCache();});
+}
+function saveCache(){try{if(window.AndroidBridge&&AndroidBridge.saveCache){AndroidBridge.saveCache(JSON.stringify(ALL.map(snapshot)));}}catch(e){}}
+function load(){
+  var btn=document.getElementById('refreshBtn');btn.classList.add('spin');
+  if(!ALL.length)showSkeletons();
+  var active=FEEDS.filter(function(f){return SETTINGS.disabled.indexOf(f.name)<0;});
+  var done=0,collected=[];
+  if(!active.length){ALL=[];afterData();btn.classList.remove('spin');return;}
+  active.forEach(function(f){
+    bridgeFetch(f.url).then(function(xml){
+      if(xml)collected=collected.concat(parseFeed(xml,f));
+      done++;
+      if(done===active.length){
+        if(collected.length){ALL=normalize(collected);afterData();translateCards();fillMissingImages();saveCache();}
+        else if(!ALL.length){afterData();}
+        btn.classList.remove('spin');
+      }
+    });
+  });
+}
+renderTopics();
+/* ============ Fonctions bonus (menace, glossaire, TL;DR, podcast, thème, votes, historique, partage, quiz) ============ */
+var GLOSSARY={"ransomware":"Logiciel malveillant qui bloque ou verrouille vos fichiers et réclame une rançon en argent pour vous les rendre.","phishing":"Arnaque par faux e-mail ou faux message qui vous pousse à donner vos mots de passe ou vos informations bancaires.","0-day":"Faille de sécurité toute nouvelle, encore inconnue de l’éditeur, que les pirates exploitent avant qu’un correctif existe.","rce":"Faille qui permet à un pirate de faire tourner ses propres programmes à distance sur votre ordinateur ou serveur.","vpn":"Outil qui crée un tunnel sécurisé sur Internet pour masquer votre position et protéger votre connexion.","chiffrement":"Technique qui transforme des données en code illisible, que seule une personne possédant la clé peut relire.","ddos":"Attaque qui inonde un site de connexions pour le saturer et le rendre inaccessible.","malware":"Terme général pour tout programme nuisible conçu pour endommager, espionner ou pirater un appareil.","cve":"Numéro officiel donné à une faille de sécurité connue pour que tout le monde puisse l’identifier facilement.","rgpd":"Loi européenne qui encadre la manière dont les entreprises collectent et utilisent vos données personnelles.","ia générative":"Intelligence artificielle capable de créer du contenu inédit comme du texte, des images ou de la musique.","llm":"Grand modèle d’intelligence artificielle entraîné sur d’énormes quantités de texte pour comprendre et écrire du langage.","cloud":"Le fait de stocker ses fichiers et d’utiliser des logiciels sur des serveurs distants via Internet, plutôt que sur son propre appareil.","api":"Passerelle technique qui permet à deux logiciels de se parler et d’échanger des données automatiquement.","open source":"Logiciel dont le code est public et que chacun peut consulter, utiliser et modifier librement.","pare-feu":"Barrière de sécurité qui filtre les connexions pour bloquer les accès indésirables à un réseau ou un appareil.","authentification à deux facteurs":"Sécurité qui demande, en plus du mot de passe, une deuxième preuve comme un code reçu sur votre téléphone.","cheval de troie":"Programme qui se fait passer pour un logiciel normal mais cache en réalité un virus ou un espion.","spyware":"Logiciel espion qui s’installe discrètement pour surveiller votre activité et voler vos informations.","botnet":"Réseau d’ordinateurs infectés et contrôlés à distance par un pirate pour mener des attaques en masse.","fuite de données":"Situation où des informations privées ou sensibles se retrouvent exposées ou volées, souvent après un piratage.","exploit":"Programme ou astuce qui profite d’une faille pour pirater un système ou en prendre le contrôle.","correctif":"Petite mise à jour publiée par un éditeur pour réparer un bug ou boucher une faille de sécurité.","porte dérobée":"Accès caché laissé dans un logiciel qui permet d’entrer dans un système en contournant la sécurité normale.","force brute":"Méthode de piratage qui essaie automatiquement des milliers de combinaisons jusqu’à trouver le bon mot de passe.","https":"Version sécurisée des sites web qui chiffre les échanges entre votre navigateur et le site visité.","cookie":"Petit fichier déposé par un site sur votre appareil pour vous reconnaître et suivre votre navigation.","deepfake":"Fausse vidéo ou fausse voix créée par intelligence artificielle pour faire dire ou faire faire n’importe quoi à une personne.","blockchain":"Registre numérique partagé et infalsifiable qui enregistre des transactions de façon transparente et sécurisée.","cryptomonnaie":"Monnaie numérique, comme le bitcoin, qui fonctionne sans banque grâce à la technologie blockchain.","bug bounty":"Programme qui récompense financièrement les personnes qui découvrent et signalent des failles dans un logiciel.","hacker":"Personne très douée en informatique qui cherche à contourner ou exploiter les protections d’un système.","dark web":"Partie cachée d’Internet, accessible avec des outils spéciaux, où circulent notamment des activités illégales.","captcha":"Petit test en ligne (images ou lettres) qui vérifie que vous êtes un humain et non un robot.","sandbox":"Espace isolé et sécurisé où l’on peut tester un programme suspect sans risque pour le reste du système.","machine learning":"Branche de l’intelligence artificielle où un programme apprend tout seul à partir d’exemples et de données.","algorithme":"Suite d’instructions qu’un ordinateur suit étape par étape pour résoudre un problème ou accomplir une tâche.","token":"Jeton numérique servant de clé temporaire pour prouver son identité ou représenter une valeur en ligne.","spam":"Courrier ou message indésirable envoyé en masse, souvent publicitaire ou frauduleux.","ver informatique":"Virus capable de se copier tout seul et de se propager d’un ordinateur à l’autre sans intervention humaine.","ingénierie sociale":"Manipulation psychologique qui pousse une personne à révéler des informations ou à commettre une erreur de sécurité.","chatbot":"Programme qui dialogue automatiquement avec vous par messages, pour répondre à des questions ou vous aider.","prompt":"Instruction ou question que l’on écrit à une intelligence artificielle pour obtenir une réponse.","zero-day":"Faille toute neuve, encore inconnue de l’éditeur, exploitée par les pirates avant qu’un correctif n’existe.","cyberattaque":"Tentative malveillante de voler, endommager ou bloquer des données ou des systèmes informatiques."};
+var GLOSS_KEYS=Object.keys(GLOSSARY).sort(function(a,b){return b.length-a.length;});
+var QUIZ=[{"q":"Quel mot de passe est le plus sûr ?","options":["motdepasse123","J'aime le café à 7h du matin !","azerty"],"correct":1,"explain":"Une phrase de passe longue, mêlant mots, chiffres et symboles, est bien plus difficile à deviner qu'un mot court ou courant."},{"q":"Que signifie l'authentification à deux facteurs (2FA) ?","options":["Utiliser deux mots de passe différents","Ajouter une deuxième preuve d'identité, comme un code sur le téléphone","Changer de mot de passe deux fois par an"],"correct":1,"explain":"La 2FA combine quelque chose que vous savez (mot de passe) avec quelque chose que vous avez (code, application, clé), ce qui bloque la plupart des piratages."},{"q":"Vous recevez un e-mail urgent de votre banque demandant vos identifiants via un lien. Que faites-vous ?","options":["Vous cliquez vite pour ne pas bloquer le compte","Vous ignorez le lien et contactez la banque par le site ou numéro officiel","Vous répondez avec vos identifiants"],"correct":1,"explain":"C'est une tentative de phishing typique. Une banque ne demande jamais vos identifiants par e-mail ; passez toujours par le canal officiel."},{"q":"Pourquoi faut-il installer les mises à jour de sécurité ?","options":["Pour avoir de nouvelles couleurs d'icônes","Pour corriger des failles que les pirates exploitent","Uniquement pour gagner de l'espace disque"],"correct":1,"explain":"Les mises à jour bouchent des vulnérabilités connues. Retarder une mise à jour laisse une porte ouverte aux attaques."},{"q":"À quoi sert principalement un VPN ?","options":["À rendre Internet plus rapide en toutes circonstances","À chiffrer votre connexion et masquer votre adresse IP","À supprimer définitivement les virus"],"correct":1,"explain":"Un VPN chiffre le trafic et cache votre IP, utile sur les réseaux non sûrs, mais ce n'est pas un antivirus et il n'accélère pas la connexion."},{"q":"Quelle est la bonne pratique pour les sauvegardes de données importantes ?","options":["Une seule copie sur l'ordinateur suffit","Appliquer la règle 3-2-1 : trois copies, deux supports, une hors site","Ne sauvegarder qu'une fois par an"],"correct":1,"explain":"La règle 3-2-1 protège contre la panne, le vol et les rançongiciels en gardant plusieurs copies dont une hors du domicile ou dans le cloud."},{"q":"Un site inconnu vous annonce que vous avez gagné un iPhone. Que faites-vous ?","options":["Vous saisissez vos coordonnées bancaires pour les frais de livraison","Vous fermez la page : c'est une arnaque","Vous partagez le lien à vos amis"],"correct":1,"explain":"Les faux gains servent à voler vos données ou votre argent. Si c'est trop beau pour être vrai, c'est une arnaque."},{"q":"Sur un Wi-Fi public gratuit, quelle attitude est la plus prudente ?","options":["Faire ses opérations bancaires sans précaution","Éviter les sites sensibles ou utiliser un VPN","Désactiver le verrouillage de son téléphone"],"correct":1,"explain":"Les réseaux publics peuvent être surveillés. Évitez les données sensibles ou chiffrez votre trafic avec un VPN."},{"q":"Une application lampe de poche demande l'accès à vos contacts et micro. Que faire ?","options":["Accepter, toutes les applis en ont besoin","Refuser : ces permissions n'ont aucun rapport avec sa fonction","Désinstaller votre antivirus"],"correct":1,"explain":"Une permission doit être cohérente avec la fonction de l'appli. Des demandes injustifiées sont un signal d'alerte."},{"q":"Faut-il réutiliser le même mot de passe sur plusieurs sites ?","options":["Oui, c'est plus simple à retenir","Non, un site piraté exposerait tous vos comptes","Oui, si le mot de passe est long"],"correct":1,"explain":"Avec un mot de passe unique par site, la fuite d'un service ne compromet pas les autres. Un gestionnaire de mots de passe aide à les gérer."},{"q":"Comment reconnaître un site web plus sûr pour un paiement ?","options":["L'adresse commence par https et le nom du site est correct","Le site a beaucoup de publicités clignotantes","Il propose uniquement le virement à un particulier"],"correct":0,"explain":"Le https indique une connexion chiffrée, mais vérifiez surtout l'orthographe exacte du nom de domaine, car les arnaqueurs imitent les vrais sites."},{"q":"Qu'est-ce qu'un gestionnaire de mots de passe ?","options":["Un logiciel qui crée et stocke des mots de passe forts","Un carnet papier posé près de l'ordinateur","Un service qui partage vos mots de passe publiquement"],"correct":0,"explain":"Il génère et retient des mots de passe uniques et complexes, protégés par un seul mot de passe maître à mémoriser."},{"q":"Un SMS vous dit qu'un colis est bloqué et demande de payer via un lien. Réaction ?","options":["Payer immédiatement les quelques euros demandés","Ne pas cliquer et vérifier sur le site officiel du transporteur","Rappeler le numéro et donner sa carte bancaire"],"correct":1,"explain":"Le smishing (phishing par SMS) imite les transporteurs. Vérifiez toujours via l'application ou le site officiel, jamais via le lien reçu."},{"q":"Que faire d'un ancien téléphone avant de le revendre ?","options":["Le vendre tel quel, c'est plus rapide","Effacer les données et réinitialiser aux réglages d'usine","Retirer seulement le fond d'écran"],"correct":1,"explain":"Une réinitialisation d'usine efface vos comptes, photos et données personnelles pour qu'ils ne tombent pas entre de mauvaises mains."},{"q":"Le 2FA par application (type authenticator) est généralement...","options":["Moins sûr que rien du tout","Plus sûr que le code par SMS","Inutile si on a un bon mot de passe"],"correct":1,"explain":"Les applications d'authentification résistent mieux au détournement de carte SIM que les codes envoyés par SMS."},{"q":"Un ami vous envoie sur les réseaux un message étrange avec un lien pressant. Que soupçonner ?","options":["Son compte est peut-être piraté","C'est forcément lui, on clique","Le lien est sûr car il vient d'un ami"],"correct":0,"explain":"Les comptes piratés servent à diffuser des liens malveillants. Vérifiez auprès de la personne par un autre moyen avant de cliquer."},{"q":"Pourquoi éviter de tout partager publiquement sur les réseaux sociaux ?","options":["Cela ralentit votre téléphone","Ces informations aident les arnaqueurs à vous cibler ou usurper votre identité","Cela consomme trop de batterie"],"correct":1,"explain":"Dates, lieux et habitudes publiés facilitent l'usurpation d'identité et les arnaques personnalisées. Limitez les informations visibles."},{"q":"Vous branchez une clé USB trouvée par terre. Bonne idée ?","options":["Oui, pour retrouver le propriétaire","Non, elle peut contenir un logiciel malveillant","Oui, si elle est jolie"],"correct":1,"explain":"Une clé inconnue peut infecter votre appareil dès le branchement. Ne connectez jamais un support dont vous ignorez l'origine."},{"q":"Qu'est-ce qu'un rançongiciel (ransomware) ?","options":["Un jeu vidéo en ligne","Un programme qui chiffre vos fichiers et exige une rançon","Un outil de nettoyage du disque"],"correct":1,"explain":"Le rançongiciel bloque l'accès à vos données contre paiement. De bonnes sauvegardes permettent de restaurer sans céder au chantage."},{"q":"Comment repérer un e-mail de phishing ?","options":["Fautes, adresse d'expéditeur douteuse et sentiment d'urgence","Il contient toujours une pièce jointe PDF","Il arrive uniquement le week-end"],"correct":0,"explain":"Fautes d'orthographe, adresses bizarres, urgence et liens suspects sont des signaux classiques d'une tentative de phishing."},{"q":"Faut-il accepter toutes les demandes d'amis d'inconnus en ligne ?","options":["Oui, plus on a de contacts mieux c'est","Non, un faux profil peut chercher à vous arnaquer","Oui, s'ils ont une belle photo"],"correct":1,"explain":"Les faux profils servent aux arnaques sentimentales ou à collecter vos données. N'acceptez que des personnes que vous connaissez vraiment."},{"q":"Quel est l'intérêt de verrouiller son téléphone avec un code ou la biométrie ?","options":["Cela améliore la qualité photo","Cela protège vos données si l'appareil est perdu ou volé","Cela augmente le stockage disponible"],"correct":1,"explain":"Un verrouillage empêche l'accès à vos messages, comptes et applications de paiement en cas de perte ou de vol."},{"q":"On vous appelle en se faisant passer pour le support technique de Microsoft. Que faire ?","options":["Donner l'accès à distance à votre ordinateur","Raccrocher : Microsoft n'appelle pas les particuliers ainsi","Communiquer votre mot de passe Windows"],"correct":1,"explain":"C'est une arnaque au faux support. Ne donnez jamais l'accès à distance ni vos identifiants à un appel non sollicité."},{"q":"Où télécharger une application mobile en confiance ?","options":["Sur les magasins officiels (App Store, Google Play)","Sur n'importe quel lien reçu par message","Sur un site inconnu proposant la version gratuite"],"correct":0,"explain":"Les magasins officiels contrôlent les applications. Les fichiers installés hors magasin peuvent contenir des logiciels malveillants."},{"q":"Un e-mail contient une pièce jointe inattendue nommée facture.exe. Réaction ?","options":["L'ouvrir pour voir de quoi il s'agit","Ne pas l'ouvrir : un fichier .exe inattendu est très suspect","La transférer à toute la famille"],"correct":1,"explain":"Les fichiers exécutables joints non sollicités sont un vecteur courant de virus. En cas de doute, n'ouvrez pas et supprimez."}];
+var SEV={"critical":["activement exploite","exploite activement","exploitation active","actively exploited","exploited in the wild","in the wild","0-day","zero-day","zero day","faille critique","vulnerabilite critique","critical vulnerability","critical flaw","rce","execution de code a distance","remote code execution","ransomware","rancongiciel","fuite massive","fuite de donnees","data breach","violation de donnees","backdoor","porte derobee","wormable","emergency patch","correctif d'urgence","under attack","attaque en cours","supply chain","cvss 10","cvss 9.8","prise de controle","compromission"],"important":["correctif","patch","mise a jour de securite","security update","vulnerability patched","faille corrigee","avis de securite","security advisory","cve-","security fix","hotfix","mitigation","bulletin de securite","update available","mise a jour disponible","correctif disponible"]};
+
+function bodyOf(a){return a.body||a.blocks||[];}
+function severityOf(a){
+  if(a.sev!=null)return a.sev;
+  var t=fold((a.title||'')+' '+(a.excerpt||''));
+  var s=0,i;
+  for(i=0;i<SEV.critical.length;i++){if(t.indexOf(SEV.critical[i])>=0){s=2;break;}}
+  if(!s){for(i=0;i<SEV.important.length;i++){if(t.indexOf(SEV.important[i])>=0){s=1;break;}}}
+  a.sev=s;return s;
+}
+function updateMenace(){
+  var el=document.getElementById('menace');if(!el)return;
+  var c=0;ALL.forEach(function(a){if(severityOf(a)===2)c++;});
+  var L=c>=6?{t:'Tempête cyber',e:'⛈️',c:'#ff4d6d'}:c>=3?{t:'Agité',e:'🌩️',c:'#ffb020'}:c>=1?{t:'Vigilance',e:'⚠️',c:'#ffb020'}:{t:'Calme',e:'🟢',c:'#12d6a5'};
+  el.style.display='inline-flex';el.style.borderColor=L.c;el.innerHTML='<span>'+L.e+'</span> Niveau de menace : <b style="color:'+L.c+'">'+L.t+'</b>'+(c?' ('+c+' alerte'+(c>1?'s':'')+')':'');
+}
+var VOTES=lsGet('tcd_votes',{});
+function voteSource(src,dir){VOTES[src]=(VOTES[src]||0)+dir;lsSet('tcd_votes',VOTES);}
+function sourceBoost(a){var v=VOTES[a.source]||0;return v>3?3:(v<-3?-3:v);}
+
+/* TL;DR extractif */
+function sentencesOf(txt){var m=(txt||'').match(/[^.!?]+[.!?]+/g);return m?m:((txt&&txt.length>40)?[txt]:[]);}
+function makeTLDR(a){
+  var sents=[];
+  var bd=bodyOf(a);if(bd.length){bd.forEach(function(b){if(b.t==='p'){sentencesOf(b.v).forEach(function(s){s=s.trim();if(s.length>45)sents.push(s);});}});}
+  if(!sents.length&&a.excerpt)sents=[a.excerpt];
+  if(sents.length<=3)return sents;
+  var kw=['critique','faille','securite','vulnerab','nouveau','annonce','permet','million','utilisateur','attaque','pirate','fuite','lance','disponible'];
+  var scored=sents.map(function(s,i){var sc=(sents.length-i)/sents.length;var f=fold(s);kw.forEach(function(w){if(f.indexOf(w)>=0)sc+=0.4;});return {s:s,sc:sc,i:i};});
+  scored.sort(function(x,y){return y.sc-x.sc;});
+  return scored.slice(0,3).sort(function(x,y){return x.i-y.i;}).map(function(o){return o.s;});
+}
+
+/* Glossaire : surligne les termes dans le lecteur (nœuds texte uniquement) */
+function glossify(){
+  if(!readerEl)return;
+  var used={};
+  var walker=document.createTreeWalker(readerEl,NodeFilter.SHOW_TEXT,null,false);
+  var nodes=[],n;
+  while(n=walker.nextNode()){var p=n.parentNode;if(p&&/^(P|H3|LI)$/.test(p.tagName)&&p.className.indexOf('rnote')<0)nodes.push(n);}
+  nodes.forEach(function(tn){
+    var txt=tn.nodeValue,low=fold(txt);
+    for(var k=0;k<GLOSS_KEYS.length;k++){
+      var term=GLOSS_KEYS[k];if(used[term])continue;
+      var ft=fold(term),idx=low.indexOf(ft);if(idx<0)continue;
+      var bfr=low.charAt(idx-1),aft=low.charAt(idx+ft.length);
+      if(bfr&&/[a-z0-9éèàâê]/.test(bfr))continue;
+      if(aft&&/[a-z0-9éèàâê]/.test(aft))continue;
+      used[term]=1;
+      var span=document.createElement('span');span.className='gl';span.setAttribute('data-t',term);span.textContent=txt.substr(idx,term.length);
+      var post=document.createTextNode(txt.substr(idx+term.length));
+      tn.nodeValue=txt.substr(0,idx);
+      tn.parentNode.insertBefore(span,tn.nextSibling);
+      tn.parentNode.insertBefore(post,span.nextSibling);
+      break;
+    }
+  });
+}
+function showGloss(el){
+  var t=el.getAttribute('data-t'),def=GLOSSARY[t];if(!def)return;
+  var pop=document.getElementById('glpop');pop.innerHTML='<b>'+esc(t)+'</b><br>'+esc(def);
+  var r=el.getBoundingClientRect();pop.style.display='block';
+  var top=r.bottom+8,left=Math.min(r.left,window.innerWidth-300);
+  pop.style.top=Math.min(top,window.innerHeight-120)+'px';pop.style.left=Math.max(8,left)+'px';
+}
+function hideGloss(){var p=document.getElementById('glpop');if(p)p.style.display='none';}
+
+/* Enrichit le lecteur après chaque rendu : TL;DR + glossaire */
+function enhanceReader(){
+  var a=readerCur;if(!a||!readerEl)return;
+  if(bodyOf(a).length){
+    var tl=makeTLDR(a);
+    if(tl.length){
+      var box=document.createElement('div');box.className='tldr';
+      box.innerHTML='<div class="tl">⚡ En bref</div><ul>'+tl.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ul>';
+      var anchor=readerEl.querySelector('.rtime');
+      if(anchor)anchor.parentNode.insertBefore(box,anchor.nextSibling);
+    }
+  }
+  glossify();
+}
+
+/* Mode podcast 🎧 */
+var podcast={on:false,queue:[],idx:0};
+function startPodcast(){
+  var list=visibleList().slice(0,15);if(!list.length)return;
+  podcast={on:true,queue:list,idx:0};playPodcast();
+}
+function playPodcast(){
+  if(!podcast.on||podcast.idx>=podcast.queue.length){stopPodcast();return;}
+  var a=podcast.queue[podcast.idx];
+  var tl=(bodyOf(a).length)?makeTLDR(a).join(' '):a.excerpt;
+  var bar=document.getElementById('podbar');
+  if(bar){bar.style.display='flex';bar.querySelector('.pt').textContent='🎧 '+(podcast.idx+1)+'/'+podcast.queue.length+' — '+a.title;}
+  speak('Article '+(podcast.idx+1)+'. '+a.title+'. '+(tl||''));
+}
+function stopPodcast(){podcast.on=false;stopSpeak();var bar=document.getElementById('podbar');if(bar)bar.style.display='none';}
+window.onSpeakDone=function(){if(podcast.on){podcast.idx++;playPodcast();}else{speaking=false;syncTts();}};
+
+/* Thème clair/sombre */
+function applyTheme(){document.documentElement.setAttribute('data-theme',SETTINGS.theme||'dark');var b=document.getElementById('themeBtn');if(b)b.textContent=(SETTINGS.theme==='light')?'🌙':'☀️';}
+function toggleTheme(){SETTINGS.theme=(SETTINGS.theme==='light')?'dark':'light';lsSet('tcd_settings',SETTINGS);applyTheme();}
+
+/* Partage */
+function toast(msg){var t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.style.display='block';clearTimeout(window.__tt);window.__tt=setTimeout(function(){t.style.display='none';},2200);}
+function shareArticle(a){
+  if(!a)return;var text=a.title+' — '+a.link;
+  if(window.AndroidBridge&&AndroidBridge.share){AndroidBridge.share(text);return;}
+  if(navigator.share){navigator.share({title:a.title,url:a.link}).catch(function(){});return;}
+  try{navigator.clipboard.writeText(text);toast('Lien copié !');}catch(e){window.prompt('Copie ce lien :',a.link);}
+}
+
+/* Historique / archives */
+function saveHistory(){
+  if(!ALL.length)return;
+  var hist=lsGet('tcd_history',{});
+  var key=new Date().toISOString().slice(0,10);
+  hist[key]=ALL.slice(0,40).map(function(a){return {title:a.title,link:a.link,img:a.img,source:a.source,cat:a.cat,date:a.date,excerpt:a.excerpt};});
+  var keys=Object.keys(hist).sort().reverse().slice(0,7);var trimmed={};keys.forEach(function(k){trimmed[k]=hist[k];});
+  lsSet('tcd_history',trimmed);
+}
+function openArchives(){
+  var hist=lsGet('tcd_history',{});var keys=Object.keys(hist).sort().reverse();
+  var m=document.getElementById('archModal'),body=document.getElementById('archBody');
+  if(!keys.length){body.innerHTML='<div style="color:var(--muted)">Aucun historique pour le moment. Reviens demain !</div>';}
+  else{
+    body.innerHTML=keys.map(function(k){
+      var d=new Date(k+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+      var arts=hist[k];
+      return '<div class="archday"><div class="archdate">'+esc(d)+' <span style="color:var(--muted);font-weight:400">('+arts.length+')</span></div>'+
+        arts.slice(0,12).map(function(a){return '<a class="archlink" href="'+esc(a.link)+'" target="_blank" rel="noopener">'+esc(a.title)+' <span>· '+esc(a.source)+'</span></a>';}).join('')+'</div>';
+    }).join('');
+  }
+  m.classList.add('open');
+}
+
+/* Quiz du jour 🧠 */
+function renderQuiz(){
+  var el=document.getElementById('quiz');if(!el||!QUIZ.length)return;
+  var start=new Date(new Date().getFullYear(),0,0);var day=Math.floor((new Date()-start)/86400000);
+  var qi=day%QUIZ.length,q=QUIZ[qi];
+  var answered=lsGet('tcd_quiz_'+qi,null);
+  var h='<div class="lbl">🧠 Quiz sécurité du jour</div><div class="qq">'+esc(q.q)+'</div><div class="qopts">';
+  q.options.forEach(function(o,i){var cls='qopt';if(answered!=null){if(i===q.correct)cls+=' ok';else if(i===answered)cls+=' ko';}h+='<button class="'+cls+'" data-qi="'+i+'"'+(answered!=null?' disabled':'')+'>'+esc(o)+'</button>';});
+  h+='</div>';
+  if(answered!=null)h+='<div class="qexp">'+(answered===q.correct?'✅ Bravo ! ':'❌ ')+esc(q.explain)+'</div>';
+  el.innerHTML=h;el.style.display='block';el.setAttribute('data-qi',qi);el.setAttribute('data-correct',q.correct);el.setAttribute('data-exp',q.explain);
+}
+
+var APP_VERSION="1.0.0";
+var UPDATE_URL="https://raw.githubusercontent.com/wk0t/tech-daily/main/version.json";
+function cmpVer(a,b){a=(''+a).split('.').map(Number);b=(''+b).split('.').map(Number);for(var i=0;i<3;i++){var x=a[i]||0,y=b[i]||0;if(x>y)return 1;if(x<y)return -1;}return 0;}
+function checkUpdate(){
+  if(!window.bridgeFetch)return;
+  bridgeFetch(UPDATE_URL).then(function(raw){
+    if(!raw)return;var v;try{v=JSON.parse(raw);}catch(e){return;}
+    if(v&&v.version&&cmpVer(v.version,APP_VERSION)>0){
+      var bar=document.getElementById('updateBar');if(!bar)return;
+      bar.innerHTML='🔔 <b>Nouvelle version '+esc(v.version)+' disponible</b> '+(v.notes?'— '+esc(v.notes):'')+' <a href="'+esc(v.apk||v.exe||'#')+'" target="_blank" rel="noopener">⬇ Télécharger</a><span class="uc" onclick="this.parentNode.style.display=\'none\'">✕</span>';
+      bar.style.display='flex';
+    }
+  });
+}
+function initFeatures(){
+  applyTheme();
+  checkUpdate();
+  renderQuiz();
+  var tb=document.getElementById('themeBtn');if(tb)tb.addEventListener('click',toggleTheme);
+  var pb=document.getElementById('podBtn');if(pb)pb.addEventListener('click',function(){if(podcast.on)stopPodcast();else startPodcast();});
+  var ab=document.getElementById('archBtn');if(ab)ab.addEventListener('click',openArchives);
+  var ps=document.getElementById('podStop');if(ps)ps.addEventListener('click',stopPodcast);
+  var am=document.getElementById('archModal');if(am)am.addEventListener('click',function(e){if(e.target.id==='archModal'||e.target.id==='archClose')am.classList.remove('open');});
+  var qz=document.getElementById('quiz');
+  if(qz)qz.addEventListener('click',function(e){var b=e.target.closest('.qopt');if(!b||b.disabled)return;var qi=qz.getAttribute('data-qi');lsSet('tcd_quiz_'+qi,parseInt(b.getAttribute('data-qi'),10));renderQuiz();});
+  document.addEventListener('click',function(e){var g=e.target.closest('.gl');if(g){showGloss(g);e.stopPropagation();}else{hideGloss();}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){hideGloss();if(podcast.on)stopPodcast();var a=document.getElementById('archModal');if(a)a.classList.remove('open');}});
+}
+
+initFeatures();
+(function init(){
+  try{if(window.AndroidBridge&&AndroidBridge.loadCache){var c=AndroidBridge.loadCache();if(c){var data=JSON.parse(c);if(data&&data.length){ALL=data;afterData();}}}}catch(e){}
+  load();
+})();
+</script>
+</body>
+</html>
