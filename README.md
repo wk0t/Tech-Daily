@@ -59,6 +59,22 @@ Le tout **sans compte, sans pub, sans traçage**.
 
 Android 7.0 (Nougat) ou plus récent.
 
+### 🐧 Sur Linux
+Télécharge **`TechCyberDaily-x86_64.AppImage`** (produit par GitHub Actions, voir plus bas), rends-le exécutable et lance-le :
+```bash
+chmod +x TechCyberDaily-x86_64.AppImage
+./TechCyberDaily-x86_64.AppImage
+```
+Le magazine s'ouvre dans ton navigateur. (Nécessite `python3`, présent par défaut sur la plupart des distributions.)
+
+### 🍎 Sur iPhone (iOS, via sideloading — DMA / UE)
+Un `.ipa` **non signé** est produit par GitHub Actions. Pour l'installer sur un iPhone, tu le **signes avec ton propre Apple ID** grâce à un outil de sideloading — c'est autorisé dans l'Union européenne grâce à la DMA :
+1. Installe **[AltStore](https://altstore.io)** (ou Sideloadly) sur ton PC/Mac.
+2. Connecte ton iPhone, ouvre AltStore, connecte-toi avec ton Apple ID (gratuit).
+3. Installe le fichier `TechCyberDaily-unsigned.ipa` → AltStore le re-signe et l'installe.
+
+> Un Apple ID gratuit suffit (l'app est à ré-signer tous les 7 jours). Un compte développeur Apple (99 €/an) permet une signature d'un an et une vraie distribution alternative.
+
 ---
 
 ## 🔄 Mise à jour automatique
@@ -87,6 +103,14 @@ Nécessite un JDK 17 et le SDK Android (build-tools 34, platform android-34). Co
 android\build_apk.ps1     # génère TechCyberDaily.apk
 ```
 > La clé de signature (`techcyber.jks`) n'est volontairement **pas** incluse dans le dépôt. Le script en régénère une automatiquement au premier build.
+
+### 🐧 Linux (.AppImage) et 🍎 iOS (.ipa) — via GitHub Actions
+Ces deux formats se compilent respectivement **sur Linux et sur macOS**. Plutôt que d'avoir ces machines, le dépôt embarque des recettes **GitHub Actions** qui les construisent pour toi, gratuitement, sur les serveurs de GitHub :
+
+- **Linux** : onglet **Actions → « Build Linux (.AppImage) » → Run workflow**. Récupère le fichier dans les *artifacts* (ou joint automatiquement à une release si tu pousses un tag `v*`).
+- **iOS** : onglet **Actions → « Build iOS (.ipa non signé) » → Run workflow**. Récupère le `.ipa` non signé dans les *artifacts*, puis signe-le avec ton Apple ID (AltStore).
+
+En local : `linux/build_appimage.sh` (sur Linux) ; `cd ios && xcodegen generate && open` (sur macOS avec Xcode).
 
 ---
 

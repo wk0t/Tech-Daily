@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Tech & Cyber Daily
+Comment=Magazine quotidien tech, cyber et IA
+Exec=AppRun
+Icon=tech-cyber-daily
+Categories=News;Network;
+Terminal=false

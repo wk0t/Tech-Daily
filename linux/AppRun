@@ -1,0 +1,10 @@
+#!/bin/sh
+# Point d'entrée de l'AppImage : lance le serveur local (Python 3 requis, présent
+# par défaut sur la quasi-totalité des distributions Linux de bureau).
+HERE="$(dirname "$(readlink -f "$0")")"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Python 3 est nécessaire. Installe-le puis relance (ex : sudo apt install python3)."
+  sleep 4
+  exit 1
+fi
+exec python3 "$HERE/server.py"

@@ -18,3 +18,11 @@ Thumbs.db
 
 # Script de push local (perso)
 Pousser_sur_GitHub.ps1
+
+# Artefacts de build Linux / iOS
+linux/AppDir/
+linux/appimagetool
+linux/*.AppImage
+ios/build/
+ios/TechCyberDaily.xcodeproj/
+ios/Resources/index.html
