@@ -4,6 +4,10 @@ Un petit magazine qui me sort chaque jour l'actu **tech, cybersécurité et IA**
 
 L'appli va chercher les articles chez **27 médias** (français et anglais), jette tout ce qui n'est pas de l'informatique, vire les pubs, traduit l'anglais en français, et me présente ça comme un vrai magazine. L'article s'ouvre **dans l'appli** — pas de redirection vers un site qui rame. Pas de compte, pas de pub, pas de mouchard.
 
+![Tech & Cyber Daily, thème sombre](docs/screenshot.png)
+
+Thème clair : [docs/screenshot-light.png](docs/screenshot-light.png). Les captures utilisent des articles d'exemple.
+
 ## Ce que ça sait faire
 
 Le principal, c'est le magazine du jour : les news des dernières 24 h, triées, nettoyées, traduites, avec une image de couverture et le texte complet lisible directement. Le filtrage est assez agressif — si un article parle de bons plans Amazon ou de politique, il dégage.
