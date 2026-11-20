@@ -1,9 +1,9 @@
 #!/bin/sh
-# Point d'entrée de l'AppImage : lance le serveur local (Python 3 requis, présent
-# par défaut sur la quasi-totalité des distributions Linux de bureau).
+# AppImage entry point: starts the local server (Python 3 required, present
+# by default on virtually all desktop Linux distributions).
 HERE="$(dirname "$(readlink -f "$0")")"
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "Python 3 est nécessaire. Installe-le puis relance (ex : sudo apt install python3)."
+  echo "Python 3 is required. Install it and run again (e.g. sudo apt install python3)."
   sleep 4
   exit 1
 fi

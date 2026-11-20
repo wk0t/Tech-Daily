@@ -1,4 +1,4 @@
-# Décrit le projet Xcode. L'outil "xcodegen" génère le .xcodeproj à partir de ce
+# Describes the Xcode project. The "xcodegen" tool generates the .xcodeproj from this
 # fichier (voir la recette GitHub Actions .github/workflows/build-ios.yml).
 name: TechCyberDaily
 options:

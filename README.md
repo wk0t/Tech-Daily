@@ -1,102 +1,102 @@
 # Tech & Cyber Daily
 
-Un petit magazine qui me sort chaque jour l'actu **tech, cybersécurité et IA**, sur PC et sur Android. J'en avais marre de faire le tour de quinze sites bourrés de pubs et de bandeaux cookies juste pour lire trois news qui m'intéressent — alors j'ai fait mon propre truc.
+A daily tech, cybersecurity and AI magazine for PC and Android. I got tired of hopping across fifteen ad-filled sites with cookie banners just to read three stories that actually matter — so I built my own.
 
-L'appli va chercher les articles chez **27 médias** (français et anglais), jette tout ce qui n'est pas de l'informatique, vire les pubs, traduit l'anglais en français, et me présente ça comme un vrai magazine. L'article s'ouvre **dans l'appli** — pas de redirection vers un site qui rame. Pas de compte, pas de pub, pas de mouchard.
+The app pulls articles from **27 outlets** (French and English), drops anything that isn't tech, strips the ads, translates non-English stories to English, and lays it out like a magazine. Articles open **inside the app** — no redirect to a slow website. No account, no ads, no tracking.
 
-![Tech & Cyber Daily, thème sombre](docs/screenshot.png)
+![Tech & Cyber Daily, dark theme](docs/screenshot.png)
 
-Thème clair : [docs/screenshot-light.png](docs/screenshot-light.png). Les captures utilisent des articles d'exemple.
+Light theme: [docs/screenshot-light.png](docs/screenshot-light.png). Screenshots use sample articles.
 
-## Ce que ça sait faire
+## Features
 
-Le principal, c'est le magazine du jour : les news des dernières 24 h, triées, nettoyées, traduites, avec une image de couverture et le texte complet lisible directement. Le filtrage est assez agressif — si un article parle de bons plans Amazon ou de politique, il dégage.
+The core is the magazine of the day: the last 24 hours of news, sorted, cleaned, translated, with a cover image and the full text readable right away. Filtering is aggressive — if a story is about Amazon deals or politics, it's out.
 
-Autour de ça j'ai empilé pas mal de confort de lecture :
+Around that, the reading comforts:
 
-- recherche par mot-clé, sujet ou source ;
-- **sujets suivis** : je marque « ransomware » ou « Apple » et les articles concernés remontent en haut, surlignés ;
-- **favoris** consultables hors ligne, articles déjà lus grisés, temps de lecture estimé ;
-- un **résumé en une ligne** (TL;DR) en tête de chaque article ;
-- un **glossaire au toucher** : je touche un terme technique, j'ai sa définition en français simple ;
-- **mode podcast** (lecture vocale enchaînée, mains libres) et lecture d'un seul article à voix haute ;
-- thème clair / sombre, archives des 7 derniers jours, partage.
+- search by keyword, topic or source;
+- **tracked topics**: mark "ransomware" or "Apple" and matching stories float to the top, highlighted;
+- **saved stories** readable offline, read stories dimmed, estimated reading time;
+- a one-line **summary (TL;DR)** at the top of each article;
+- a **tap-to-define glossary**: tap a technical term, get a plain-English definition;
+- **podcast mode** (hands-free chained voice reading) and read-aloud for a single article;
+- light/dark theme, 7-day archives, sharing.
 
-Et comme c'est orienté cyber, il y a un peu de sel en plus : une **alerte menace** qui met en avant les news critiques (0-day, ransomware, faille exploitée), un **niveau de menace du jour**, un petit **quiz sécurité** et l'astuce du jour.
+Since it's cyber-oriented, there's extra seasoning: a **threat alert** that surfaces critical stories (zero-days, ransomware, exploited flaws), a **threat level for the day**, a small **security quiz** and the tip of the day.
 
-L'appli se prévient elle-même quand une nouvelle version sort (un bandeau, rien de plus — elle ne télécharge jamais rien toute seule).
+The app checks for its own updates and shows a banner when a new version is out — it never downloads anything on its own.
 
-## Installer
+## Install
 
 ### Windows
 
-Récupère **[`TechCyberDaily.exe`](../../releases/latest)**, double-clique, et le magazine du jour s'ouvre dans ton navigateur. Au premier lancement Windows va râler avec SmartScreen (normal, c'est pas signé) → *Informations complémentaires* → *Exécuter quand même*.
+Grab **[`TechCyberDaily.exe`](../../releases/latest)**, double-click it, and today's magazine opens in your browser. On first run Windows will complain via SmartScreen (normal, the exe isn't signed) → *More info* → *Run anyway*.
 
-Si tu veux qu'il s'ouvre tout seul le matin, lance `pc/Activer_ouverture_auto.ps1` (clic droit → Exécuter avec PowerShell).
+To have it open by itself every morning, run `pc/enable-autostart.ps1` (right-click → Run with PowerShell). `pc/disable-autostart.ps1` removes the scheduled task.
 
 ### Android
 
-Télécharge **[`TechCyberDaily.apk`](../../releases/latest)** sur le téléphone, ouvre-le, et autorise l'installation depuis une source inconnue quand Android le demande. Play Protect va prévenir (normal, l'appli n'est pas sur le Play Store) → *Installer quand même*. Il faut Android 7.0 ou plus récent.
+Download **[`TechCyberDaily.apk`](../../releases/latest)** on the phone, open it, and allow installs from unknown sources when Android asks. Play Protect will warn (normal, the app isn't on the Play Store) → *Install anyway*. Requires Android 7.0+.
 
 ### Linux
 
-Prends le **`.AppImage`** dans la [dernière release](../../releases/latest), rends-le exécutable et lance-le :
+Take the **`.AppImage`** from the [latest release](../../releases/latest), make it executable and run it:
 
 ```bash
 chmod +x TechCyberDaily-x86_64.AppImage
 ./TechCyberDaily-x86_64.AppImage
 ```
 
-Le magazine s'ouvre dans le navigateur. Il faut juste `python3`, présent d'office sur la plupart des distros.
+The magazine opens in the browser. You only need `python3`, which ships with most distros.
 
 ### iPhone
 
-Le `.ipa` de la release est **non signé**. Pour l'installer, tu le signes avec ton propre Apple ID via un outil de sideloading — c'est permis dans l'UE grâce au DMA :
+The `.ipa` in the release is **unsigned**. To install it, re-sign it with your own Apple ID through a sideloading tool — allowed in the EU under the DMA:
 
-1. installe [AltStore](https://altstore.io) (ou Sideloadly) sur ton ordi ;
-2. branche l'iPhone, ouvre AltStore, connecte-toi avec ton Apple ID (un compte gratuit suffit) ;
-3. installe `TechCyberDaily-unsigned.ipa` → AltStore le re-signe et le pose sur le téléphone.
+1. install [AltStore](https://altstore.io) (or Sideloadly) on your computer;
+2. plug in the iPhone, open AltStore, sign in with your Apple ID (a free account is enough);
+3. install `TechCyberDaily-unsigned.ipa` → AltStore re-signs it and installs it on the phone.
 
-Avec un Apple ID gratuit, il faut le ré-installer tous les 7 jours. Un compte développeur (99 €/an) tient un an.
+With a free Apple ID you have to re-install every 7 days. A developer account ($99/year) lasts a year.
 
-## Compiler soi-même
+## Build it yourself
 
-**PC** — rien à installer, le compilateur C# est fourni avec Windows :
+**PC** — nothing to install, the C# compiler ships with Windows:
 
 ```powershell
 pc\build_exe.ps1
 ```
 
-**Android** — il faut un JDK 17 et le SDK Android (build-tools 34). Pas de Gradle, je fais tout à la main avec `aapt` + `d8` + `apksigner` :
+**Android** — you need a JDK 17 and the Android SDK (build-tools 34). No Gradle: the build is done by hand with `aapt` + `d8` + `apksigner`:
 
 ```powershell
 android\build_apk.ps1
 ```
 
-La clé de signature (`techcyber.jks`) n'est volontairement pas dans le dépôt — le script en génère une au premier build.
+The signing key (`techcyber.jks`) is deliberately not in the repo — the script generates one on first build.
 
-**Linux et iOS** se compilent sur Linux et macOS. Comme je n'ai ni l'un ni l'autre sous la main, le dépôt embarque deux recettes **GitHub Actions** qui les construisent gratuitement sur les serveurs de GitHub (onglet *Actions* → *Run workflow*, ou automatiquement quand je pousse un tag `v*`). En local, ce serait `linux/build_appimage.sh` côté Linux et `cd ios && xcodegen generate` côté Mac.
+**Linux and iOS** build on Linux and macOS. Since I don't have either at hand, the repo ships two **GitHub Actions** recipes that build them for free on GitHub's servers (Actions tab → *Run workflow*, or automatically when a `v*` tag is pushed). Locally it would be `linux/build_appimage.sh` on Linux and `cd ios && xcodegen generate` on a Mac.
 
-## Comment ça marche
+## How it works
 
-Les news sont récupérées **directement** depuis les flux RSS publics des médias, sans serveur intermédiaire. Sur PC c'est du PowerShell ; sur Android un pont natif en Java contourne les restrictions du navigateur (CORS) et gère l'encodage à la main. Le texte complet de chaque article est extrait de sa page d'origine, débarrassé de ses pubs, puis affiché dans le lecteur intégré. Pour la traduction, j'utilise le point d'accès public et gratuit de Google Traduction.
+Stories are fetched **directly** from the outlets' public RSS feeds, no intermediary server. On PC it's PowerShell; on Android a native Java bridge works around the browser's CORS restrictions and handles character encodings by hand. Each article's full text is extracted from its original page, stripped of ads, and shown in the built-in reader. Translation uses Google Translate's public free endpoint.
 
-Rien n'est stocké ailleurs que sur ton appareil.
+Nothing is stored anywhere but on your device.
 
-## Le dépôt en deux mots
+## Repo layout
 
 ```
-pc/         la version PC : un gros script PowerShell (le moteur) + le build en .exe
-android/    la version Android : une WebView + un pont natif Java, compilée en .apk
-linux/      la recette AppImage
-ios/        la recette iOS (WebView Swift)
-version.json  la version publiée, pour la mise à jour auto
+pc/           PC version: a PowerShell script (the engine) + the .exe build
+android/      Android version: a WebView + a native Java bridge, built into an .apk
+linux/        AppImage recipe
+ios/          iOS recipe (Swift WebView)
+version.json  published version, used for the in-app update check
 ```
 
 ## Note
 
-Projet perso, fourni tel quel. Les articles restent la propriété de leurs médias — chacun garde un lien vers sa source. L'appli ne fait qu'agréger et mettre en forme des flux publics pour un usage privé.
+Personal project, provided as-is. Articles remain the property of their outlets — every story keeps a link to its source. The app only aggregates and formats public feeds for private use.
 
-## Licence
+## License
 
-[MIT](LICENSE) — fais-en ce que tu veux.
+[MIT](LICENSE) — do whatever you want with it.

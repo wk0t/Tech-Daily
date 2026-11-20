@@ -1,13 +1,13 @@
 name: Build Linux (.AppImage)
 
-# Lance-le à la main (onglet Actions -> "Run workflow") ou automatiquement
-# quand tu pousses un tag de version (ex : v1.0.1).
+# Run it manually (Actions tab -> "Run workflow") or automatically
+# when you push a version tag (e.g. v1.0.1).
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
 
-# Nécessaire pour que l'étape "Joindre à la release" puisse écrire sur la release.
+# Required so the "Attach to release" step can write to the release.
 permissions:
   contents: write
 
@@ -17,23 +17,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Dépendances
+      - name: Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y wget file libfuse2
 
-      - name: Construire l'AppImage
+      - name: Build the AppImage
         run: |
           chmod +x linux/build_appimage.sh
           ./linux/build_appimage.sh
 
-      - name: Publier l'artefact
+      - name: Upload the artifact
         uses: actions/upload-artifact@v4
         with:
           name: TechCyberDaily-AppImage
           path: linux/TechCyberDaily-x86_64.AppImage
 
-      - name: Joindre à la release (si tag)
+      - name: Attach to release (if tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:

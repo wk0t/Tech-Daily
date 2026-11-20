@@ -3,8 +3,8 @@ import WebKit
 import AVFoundation
 
 // Affiche l'application web (index.html) dans une WKWebView et fournit le "pont"
-// natif attendu par la page (objet AndroidBridge) : requêtes réseau, synthèse
-// vocale, partage. Ainsi tout le code web est réutilisé tel quel, sans modification.
+// native side expected by the page (AndroidBridge object): network requests,
+// text-to-speech, sharing. All the web code is reused as-is, unmodified.
 class WebViewController: UIViewController, WKScriptMessageHandler, AVSpeechSynthesizerDelegate {
 
     private var webView: WKWebView!
@@ -16,7 +16,7 @@ class WebViewController: UIViewController, WKScriptMessageHandler, AVSpeechSynth
         let controller = WKUserContentController()
         controller.add(self, name: "native")
 
-        // Recrée l'objet AndroidBridge côté JS, branché sur le natif iOS.
+        // Recreate the AndroidBridge object in JS, wired to the native iOS side.
         let bridge = """
         window.AndroidBridge = {
           fetchUrl: function(url, id){ window.webkit.messageHandlers.native.postMessage({t:'fetch', url:url, id:id}); },
@@ -92,7 +92,7 @@ class WebViewController: UIViewController, WKScriptMessageHandler, AVSpeechSynth
         }
     }
 
-    // Fin de lecture vocale -> l'app enchaîne (mode podcast)
+    // Speech finished -> the app moves on (podcast mode)
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         webView.evaluateJavaScript("window.onSpeakDone && onSpeakDone()", completionHandler: nil)
     }

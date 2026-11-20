@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "date": "2026-07-10",
-  "notes": "Version initiale : 27 sources, traduction FR, lecture integree, alertes menace, quiz, glossaire, podcast, theme clair/sombre, favoris, archives.",
+  "notes": "Initial release: 27 sources, on-the-fly translation, ad-free built-in reader, threat alerts, quiz, glossary, podcast mode, light/dark theme, saved stories, archives.",
   "apk": "https://github.com/wk0t/tech-daily/raw/main/TechCyberDaily.apk",
   "exe": "https://github.com/wk0t/tech-daily/raw/main/TechCyberDaily.exe"
 }

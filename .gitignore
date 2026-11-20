@@ -3,7 +3,7 @@ android/build/
 *.class
 *.dex
 
-# Clé de signature — NE JAMAIS committer (secret)
+# Signing key — NEVER commit this (secret)
 *.jks
 *.keystore
 

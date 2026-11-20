@@ -54,13 +54,13 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl("file:///android_asset/index.html");
 
-        // Synthèse vocale (français)
+        // Text-to-speech (English)
         try {
             tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
                 @Override
                 public void onInit(int status) {
                     if (status == TextToSpeech.SUCCESS) {
-                        try { tts.setLanguage(Locale.FRENCH); } catch (Exception e) {}
+                        try { tts.setLanguage(Locale.ENGLISH); } catch (Exception e) {}
                         try {
                             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                                 @Override public void onStart(String id) {}
@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
             });
         } catch (Exception e) {}
 
-        // Permission notifications (Android 13+) + programmation du rappel quotidien
+        // Notification permission (Android 13+) + schedule the daily reminder
         try {
             if (Build.VERSION.SDK_INT >= 33) {
                 requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1);
@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
                         Intent i = new Intent(Intent.ACTION_SEND);
                         i.setType("text/plain");
                         i.putExtra(Intent.EXTRA_TEXT, text);
-                        Intent chooser = Intent.createChooser(i, "Partager l'article");
+                        Intent chooser = Intent.createChooser(i, "Share article");
                         chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(chooser);
                     } catch (Exception e) {}
