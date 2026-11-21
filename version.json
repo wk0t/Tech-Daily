@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
-  "date": "2026-07-10",
-  "notes": "Initial release: 27 sources, on-the-fly translation, ad-free built-in reader, threat alerts, quiz, glossary, podcast mode, light/dark theme, saved stories, archives.",
-  "apk": "https://github.com/wk0t/tech-daily/raw/main/TechCyberDaily.apk",
-  "exe": "https://github.com/wk0t/tech-daily/raw/main/TechCyberDaily.exe"
+  "version": "1.1.0",
+  "date": "2026-11-21",
+  "notes": "Bilingual EN/FR UI with language picker, editorial redesign, shared web template on all platforms, rebuilt APK/AppImage.",
+  "apk": "https://github.com/wk0t/Tech-Daily/releases/latest/download/TechCyberDaily.apk",
+  "exe": "https://github.com/wk0t/Tech-Daily/releases/latest/download/TechCyberDaily.exe"
 }
