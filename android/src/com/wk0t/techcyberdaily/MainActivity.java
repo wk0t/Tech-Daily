@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private String pendingSpeak = null;
+    private String pendingLang = "en";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,13 +55,13 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl("file:///android_asset/index.html");
 
-        // Synthèse vocale (français)
+        // Text-to-speech (English)
         try {
             tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
                 @Override
                 public void onInit(int status) {
                     if (status == TextToSpeech.SUCCESS) {
-                        try { tts.setLanguage(Locale.FRENCH); } catch (Exception e) {}
+                        try { tts.setLanguage(Locale.ENGLISH); } catch (Exception e) {}
                         try {
                             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                                 @Override public void onStart(String id) {}
@@ -75,13 +76,13 @@ public class MainActivity extends Activity {
                             });
                         } catch (Exception e) {}
                         ttsReady = true;
-                        if (pendingSpeak != null) { doSpeak(pendingSpeak); pendingSpeak = null; }
+                        if (pendingSpeak != null) { doSpeak(pendingSpeak, pendingLang); pendingSpeak = null; }
                     }
                 }
             });
         } catch (Exception e) {}
 
-        // Permission notifications (Android 13+) + programmation du rappel quotidien
+        // Notification permission (Android 13+) + schedule the daily reminder
         try {
             if (Build.VERSION.SDK_INT >= 33) {
                 requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1);
@@ -90,9 +91,12 @@ public class MainActivity extends Activity {
         try { NotifReceiver.scheduleDaily(this); } catch (Exception e) {}
     }
 
-    private void doSpeak(String text) {
+    private void doSpeak(String text, String lang) {
         if (tts == null || text == null) return;
-        try { tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tcd"); } catch (Exception e) {}
+        try {
+            tts.setLanguage("fr".equals(lang) ? Locale.FRENCH : Locale.ENGLISH);
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tcd");
+        } catch (Exception e) {}
     }
 
     @Override
@@ -167,13 +171,21 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void speak(final String text) {
+        public void speak(final String text, final String lang) {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if (ttsReady) doSpeak(text); else pendingSpeak = text;
+                    if (ttsReady) doSpeak(text, lang); else { pendingSpeak = text; pendingLang = lang; }
                 }
             });
+        }
+
+        // Stores the UI language so notifications follow it (set from the web UI language picker)
+        @JavascriptInterface
+        public void setLang(String lang) {
+            try {
+                getSharedPreferences("app", MODE_PRIVATE).edit().putString("lang", "fr".equals(lang) ? "fr" : "en").apply();
+            } catch (Exception e) {}
         }
 
         @JavascriptInterface
@@ -196,7 +208,7 @@ public class MainActivity extends Activity {
                         Intent i = new Intent(Intent.ACTION_SEND);
                         i.setType("text/plain");
                         i.putExtra(Intent.EXTRA_TEXT, text);
-                        Intent chooser = Intent.createChooser(i, "Partager l'article");
+                        Intent chooser = Intent.createChooser(i, "Share article");
                         chooser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(chooser);
                     } catch (Exception e) {}

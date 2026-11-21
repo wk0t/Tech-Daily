@@ -17,7 +17,7 @@ public class NotifReceiver extends BroadcastReceiver {
     static final String CHANNEL = "tcd_daily";
     static final int REQ = 4201;
 
-    // Programme (ou reprogramme) un rappel quotidien vers 8h00.
+    // Schedules (or reschedules) a daily reminder at 8:00 AM.
     static void scheduleDaily(Context ctx) {
         AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
@@ -43,9 +43,10 @@ public class NotifReceiver extends BroadcastReceiver {
     public void onReceive(Context ctx, Intent intent) {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
+        boolean fr = "fr".equals(ctx.getSharedPreferences("app", Context.MODE_PRIVATE).getString("lang", "en"));
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL, "Rappel quotidien", NotificationManager.IMPORTANCE_DEFAULT);
-            ch.setDescription("Te prévient chaque matin que ton magazine est prêt.");
+            NotificationChannel ch = new NotificationChannel(CHANNEL, fr ? "Rappel quotidien" : "Daily reminder", NotificationManager.IMPORTANCE_DEFAULT);
+            ch.setDescription(fr ? "Te prévient chaque matin que ton magazine est prêt." : "Tells you each morning when your magazine is ready.");
             nm.createNotificationChannel(ch);
         }
         Intent open = new Intent(ctx, MainActivity.class);
@@ -59,7 +60,7 @@ public class NotifReceiver extends BroadcastReceiver {
         else b = new Notification.Builder(ctx);
         b.setSmallIcon(android.R.drawable.ic_dialog_info)
          .setContentTitle("Tech & Cyber Daily")
-         .setContentText("Ton magazine du jour est prêt — tech, cyber & IA.")
+         .setContentText(fr ? "Le magazine du jour est prêt — tech, cyber & IA." : "Today's magazine is ready — tech, cyber & AI.")
          .setAutoCancel(true)
          .setContentIntent(pi);
         try { nm.notify(1, b.build()); } catch (Exception e) {}

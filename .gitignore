@@ -3,7 +3,7 @@ android/build/
 *.class
 *.dex
 
-# Clé de signature — NE JAMAIS committer (secret)
+# Signing key — NEVER commit this (secret)
 *.jks
 *.keystore
 
@@ -26,3 +26,4 @@ linux/*.AppImage
 ios/build/
 ios/TechCyberDaily.xcodeproj/
 ios/Resources/index.html
+*.conflict1

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Tech & Cyber Daily — serveur local (version Linux).
+Tech & Cyber Daily — local server (Linux version).
 
-L'application est la même page web que la version Android. Comme un navigateur
-bloque les requêtes vers d'autres sites (CORS), ce petit serveur local joue le
-rôle de relais : la page lui demande une URL, il va la chercher et renvoie le
-contenu. Il ouvre ensuite le magazine dans le navigateur par défaut.
+The app is the same web page as the Android version. Since a browser blocks
+cross-site requests (CORS), this small local server acts as a relay: the page
+asks it for a URL, it fetches it and returns the content. It then opens the
+magazine in the default browser.
 """
 
 import http.server
@@ -23,8 +23,8 @@ PORT = 8791
 BASE = os.path.dirname(os.path.abspath(__file__))
 INDEX_PATH = os.path.join(BASE, "index.html")
 
-# Petit script injecté dans la page : bridgeFetch passe par /p (c'est le serveur
-# qui fait la requête réseau, donc plus de blocage CORS).
+# Small script injected into the page: bridgeFetch goes through /p (the server
+# performs the network request, so no more CORS blocking).
 _BRIDGE = (
     "<script>window.bridgeFetch=function(u){"
     "return fetch('/p?u='+encodeURIComponent(u))"
@@ -44,7 +44,7 @@ PAGE = None
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
-        pass  # pas de bruit dans le terminal
+        pass  # keep the terminal quiet
 
     def do_GET(self):
         if self.path.startswith("/p?"):
@@ -95,7 +95,7 @@ def main():
     url = "http://127.0.0.1:%d/" % PORT
     with Server(("127.0.0.1", PORT), Handler) as httpd:
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-        print("Tech & Cyber Daily : " + url + "  (ferme cette fenêtre pour quitter)")
+        print("Tech & Cyber Daily: " + url + "  (close this window to quit)")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

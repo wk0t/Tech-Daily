@@ -1,6 +1,6 @@
 import UIKit
 
-// Point d'entrée de l'application iOS.
+// iOS app entry point.
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
