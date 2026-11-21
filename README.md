@@ -2,7 +2,7 @@
 
 A daily tech, cybersecurity and AI magazine for PC and Android. I got tired of hopping across fifteen ad-filled sites with cookie banners just to read three stories that actually matter — so I built my own.
 
-The app pulls articles from **27 outlets** (French and English), drops anything that isn't tech, strips the ads, translates non-English stories to English, and lays it out like a magazine. Articles open **inside the app** — no redirect to a slow website. No account, no ads, no tracking.
+The app pulls articles from **27 outlets** (French and English), drops anything that isn't tech, strips the ads, translates non-English stories into your chosen language (EN/FR picker in Settings), and lays it out like a magazine. Articles open **inside the app** — no redirect to a slow website. No account, no ads, no tracking.
 
 ![Tech & Cyber Daily, dark theme](docs/screenshot.png)
 
@@ -30,7 +30,7 @@ The app checks for its own updates and shows a banner when a new version is out 
 
 ### Windows
 
-Grab **[`TechCyberDaily.exe`](../../releases/latest)**, double-click it, and today's magazine opens in your browser. On first run Windows will complain via SmartScreen (normal, the exe isn't signed) → *More info* → *Run anyway*.
+Grab **[`TechCyberDaily.exe`](../../releases/latest)**, double-click it, and today's magazine opens in your browser. Optional: `powershell -File pc\TechCyberDaily.ps1 -Lang fr` to generate the French edition directly. On first run Windows will complain via SmartScreen (normal, the exe isn't signed) → *More info* → *Run anyway*.
 
 To have it open by itself every morning, run `pc/enable-autostart.ps1` (right-click → Run with PowerShell). `pc/disable-autostart.ps1` removes the scheduled task.
 

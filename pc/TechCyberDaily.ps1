@@ -6,6 +6,12 @@
 #  IMPORTANT: keep this file encoded as UTF-8 WITH BOM
 #  (otherwise Windows PowerShell 5.1 mangles accented characters).
 # =====================================================================
+param([string]$Lang = 'en')
+# UI language: 'en' (default) or 'fr'. Non-matching feeds are translated to this language
+# and the generated page's UI strings use it (override in the app's Settings afterwards).
+$uiLang = $Lang.ToLower()
+if ($uiLang -notin @('en','fr')) { $uiLang = 'en' }
+
 $ProgressPreference = 'SilentlyContinue'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13 } catch {}
 [System.Net.ServicePointManager]::DefaultConnectionLimit = 16
@@ -528,7 +534,7 @@ foreach ($it in $top) {
 # =====================================================================
 #  PHASE 3 — Automatic translation to English (non-English stories)
 # =====================================================================
-$toTranslate = @($top | Where-Object { $_.lang -ne 'en' })
+$toTranslate = @($top | Where-Object { $_.lang -ne $uiLang })
 if ($toTranslate.Count -gt 0) {
   Write-Host ("Translating {0} non-English stories to English..." -f $toTranslate.Count) -ForegroundColor Cyan
   $trScript = {
@@ -537,7 +543,7 @@ if ($toTranslate.Count -gt 0) {
       if ($arr.Count -eq 0) { return @() }
       $blob = ($arr -join "`n[[[0]]]`n")
       try {
-        $u = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=" + [Uri]::EscapeDataString($blob)
+        $u = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$uiLang&dt=t&q=" + [Uri]::EscapeDataString($blob)
         $req = [Net.HttpWebRequest]::Create($u)
         $req.UserAgent = 'Mozilla/5.0'; $req.Timeout = 15000
         $resp = $req.GetResponse()
@@ -643,8 +649,7 @@ try {
 #  UI template: the same single-file app as Android/iOS/Linux
 #  (android/assets/index.html), with the fetched stories injected
 #  below as window.PC_DATA (the page then skips its own fetching).
-# ---------------------------------------------------------------
-$template = @'
+# ---------------------------------------------------------------$template = @'
 <!DOCTYPE html>
 <!--
   Tech & Cyber Daily — Android app (WebView)
@@ -984,7 +989,9 @@ footer{
 }
 .srctag.on{border-color:var(--accent); color:var(--accent)}
 .fsbtns{display:flex; gap:7px}
-.fsbtns button{
+.langbtns{display:flex; gap:7px}
+.langbtns button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.fsbtns button,.langbtns button{
   width:40px; height:34px; border-radius:8px; border:1px solid var(--line);
   background:var(--surface2); color:var(--txt); cursor:pointer; font-size:14px; font-family:var(--font-mono);
 }
@@ -1080,32 +1087,32 @@ footer{
   <div class="updatebar" id="updateBar"></div>
   <header class="top">
     <div class="brand">
-      <span class="kick"><span class="dot"></span>Today's edition</span>
+      <span class="kick"><span class="dot"></span><span data-i18n="kick">Today's edition</span></span>
       <h1>Tech &amp; Cyber Daily</h1>
       <div class="sub" id="todaySub">—</div>
     </div>
     <div class="hbtns">
-      <button class="iconbtn" id="podBtn" title="Podcast mode" aria-label="Podcast mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3v5zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3v5z"/></svg></button>
-      <button class="iconbtn" id="ttsAllBtn" title="Read the brief aloud" aria-label="Read the brief aloud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>
-      <button class="iconbtn" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle light/dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18V3z" fill="currentColor" stroke="none"/></svg></button>
-      <button class="iconbtn" id="archBtn" title="Archives" aria-label="Archives"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg></button>
-      <button class="iconbtn" id="setBtn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="6" x2="14" y2="6"/><line x1="10" y1="6" x2="3" y2="6"/><circle cx="12" cy="6" r="2"/><line x1="21" y1="12" x2="16" y2="12"/><line x1="12" y1="12" x2="3" y2="12"/><circle cx="14" cy="12" r="2"/><line x1="21" y1="18" x2="12" y2="18"/><line x1="8" y1="18" x2="3" y2="18"/><circle cx="10" cy="18" r="2"/></svg></button>
+      <button class="iconbtn" id="podBtn" data-i18n-title="podcastMode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3v5zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3v5z"/></svg></button>
+      <button class="iconbtn" id="ttsAllBtn" data-i18n-title="readBrief"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>
+      <button class="iconbtn" id="themeBtn" data-i18n-title="toggleTheme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18V3z" fill="currentColor" stroke="none"/></svg></button>
+      <button class="iconbtn" id="archBtn" data-i18n-title="archives"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg></button>
+      <button class="iconbtn" id="setBtn" data-i18n-title="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="6" x2="14" y2="6"/><line x1="10" y1="6" x2="3" y2="6"/><circle cx="12" cy="6" r="2"/><line x1="21" y1="12" x2="16" y2="12"/><line x1="12" y1="12" x2="3" y2="12"/><circle cx="14" cy="12" r="2"/><line x1="21" y1="18" x2="12" y2="18"/><line x1="8" y1="18" x2="3" y2="18"/><circle cx="10" cy="18" r="2"/></svg></button>
     </div>
   </header>
 
   <div class="searchbar">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-    <input id="search" type="search" placeholder="Search stories, topics, sources…" autocomplete="off">
+    <input id="search" type="search" data-i18n-ph="searchPh" placeholder="Search stories, topics, sources…" autocomplete="off">
   </div>
 
   <section class="notice tip">
-    <div class="lbl">Tip of the day</div>
+    <div class="lbl" data-i18n="tipLbl">Tip of the day</div>
     <h2 id="tipTitle">—</h2>
     <p id="tipText">—</p>
   </section>
 
   <section class="notice digest" id="digest" style="display:none">
-    <div class="lbl">The brief — top 3</div>
+    <div class="lbl" data-i18n="briefLbl">The brief — top 3</div>
     <ol id="digestList"></ol>
   </section>
 
@@ -1125,35 +1132,37 @@ footer{
   <div class="status" id="status" style="display:none"></div>
 
   <footer>
-    Stories pulled from the public RSS feeds of the listed outlets — ad-free reading, non-English items translated on the fly.<br>
-    Every story links back to its original source.<br>
-    <span style="opacity:.6">Tech &amp; Cyber Daily v1.1.0 · auto-updates from GitHub</span>
+    <span data-i18n="foot1">Stories pulled from the public RSS feeds of the listed outlets — ad-free reading, non-English items translated on the fly.</span><br>
+    <span data-i18n="foot2">Every story links back to its original source.</span><br>
+    <span style="opacity:.6"><span data-i18n="footBrand">Tech &amp; Cyber Daily</span> v1.1.0 · <span data-i18n="foot3">auto-updates from GitHub</span></span>
   </footer>
 </div>
 
-<div class="refreshbar"><button id="refreshBtn" title="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg></button></div>
+<div class="refreshbar"><button id="refreshBtn" data-i18n-title="refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg></button></div>
 
 <!-- Settings -->
 <div class="modal" id="setModal">
   <div class="sheet">
-    <h3>Settings</h3>
-    <div class="setrow"><span>Translate non-English stories</span><div class="toggle" id="tgTranslate"><div class="knob"></div></div></div>
-    <div class="setrow"><span>Cluster duplicate stories</span><div class="toggle" id="tgCluster"><div class="knob"></div></div></div>
-    <div class="setrow"><span>Text size</span><div class="fsbtns"><button id="fsMinus" aria-label="Smaller text">A−</button><button id="fsPlus" aria-label="Larger text">A+</button></div></div>
-    <div class="srchead">Active sources <span>(tap to enable/disable)</span></div>
+    <h3 data-i18n="settings">Settings</h3>
+    <div class="setrow"><span data-i18n="setTranslate">Translate non-English stories</span><div class="toggle" id="tgTranslate"><div class="knob"></div></div></div>
+    <div class="setrow"><span data-i18n="setCluster">Cluster duplicate stories</span><div class="toggle" id="tgCluster"><div class="knob"></div></div></div>
+    <div class="setrow"><span data-i18n="setFont">Text size</span><div class="fsbtns"><button id="fsMinus" data-i18n-title="fontSmaller" aria-label="Smaller text">A−</button><button id="fsPlus" data-i18n-title="fontLarger" aria-label="Larger text">A+</button></div></div>
+    <div class="setrow"><span data-i18n="language">Language</span><div class="langbtns"><button id="langEn">EN</button><button id="langFr">FR</button></div></div>
+    <div class="srchead"><span data-i18n="srcHead">Active sources</span> <span data-i18n="srcHint">(tap to enable/disable)</span></div>
     <div class="srcgrid" id="srcGrid"></div>
-    <button class="closebtn" id="setClose">Done</button>
+    <button class="closebtn" id="setClose" data-i18n="done">Done</button>
   </div>
 </div>
 
 <div class="reader-backdrop" id="readerBackdrop"><div class="reader" id="reader"></div></div>
 <div id="glpop" class="glpop"></div>
 <div id="toast" class="toast"></div>
-<div class="podbar" id="podbar"><div class="pt"></div><button id="podStop">Stop</button></div>
-<div class="modal" id="archModal"><div class="sheet"><h3>Archives</h3><div id="archBody"></div><button class="closebtn" id="archClose">Close</button></div></div>
+<div class="podbar" id="podbar"><div class="pt"></div><button id="podStop" data-i18n="stop">Stop</button></div>
+<div class="modal" id="archModal"><div class="sheet"><h3 data-i18n="archives">Archives</h3><div id="archBody"></div><button class="closebtn" id="archClose" data-i18n="close">Close</button></div></div>
 
-<script>window.PC_DATA = __NEWS_JSON__;</script>
 <script>
+window.PC_DATA = __NEWS_JSON__;
+window.PC_LANG = '__LANG__';
 /* ================= Feeds ================= */
 var FEEDS=[
   {url:"https://www.zataz.com/feed/",name:"Zataz",cat:"cyber",lang:"fr"},
@@ -1201,7 +1210,96 @@ function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 var SETTINGS=lsGet('tcd_settings',{translate:true,cluster:true,fontScale:1,disabled:[]});
 var READ=lsGet('tcd_read',{});          // link -> 1
 var FAV=lsGet('tcd_fav',{});            // link -> snapshot
-var TOPICS=lsGet('tcd_topics',[]);      // ['ransomware', ...]
+var TOPICS=lsGet('tcd_topics',[]);      // tracked topic keywords
+/* ================= i18n — UI language, switchable in Settings (EN / FR) ================= */
+var I18N={
+en:{
+  kick:"Today's edition", searchPh:"Search stories, topics, sources…",
+  tipLbl:"Tip of the day", briefLbl:"The brief — top 3",
+  menaceLbl:"Threat level:", levels:{0:"Calm",1:"Watch",3:"Elevated",6:"Storm"},
+  alerts1:"{n} alert", alertsN:"{n} alerts",
+  quizLbl:"Daily security quiz", qOk:"Correct. ", qKo:"Not quite. ",
+  chipAll:"All", chipFav:"Saved",
+  count1:"{n} story", countN:"{n} stories", savedSuffix:"saved",
+  noFav1:"No saved stories", noFav2:"Tap the heart on a story to keep it here.",
+  noCat1:"Nothing in this section", noCat2:"Try another filter or search.",
+  noLoad1:"No stories loaded", noLoad2:"Check your connection, then tap the refresh button.",
+  tracked:"Tracked:", addTopic:"+ track a topic", trackedTopic:"Tracked topic", saveStory:"Save story",
+  translated:"· translated", alertPill:"ALERT", minRead:"{n} min read",
+  rel1:"+{n} source", relN:"+{n} sources",
+  taMin:"{n} min ago", taHour:"{n} h ago", taYesterday:"yesterday", taDay:"{n} d ago",
+  close:"Close", readAloud:"Read aloud", share:"Share", moreSrc:"More from this source", lessSrc:"Less from this source",
+  moreFrom:"More from {s}", lessFrom:"Less from {s}",
+  inShort:"In short", translating:"Translating…", loading:"Loading story…",
+  noFull:"The full text could not be extracted — open the original story below.",
+  alsoBy:"Also covered by", openSrc:"Open source: {s}",
+  linkCopied:"Link copied", copyLink:"Copy this link:",
+  noHist:"No history yet — come back tomorrow.",
+  podcastIntro:"Here are today's top stories. ",
+  updAvail:"Version {v} is available", download:"Download", dismiss:"Dismiss",
+  podcastMode:"Podcast mode", readBrief:"Read the brief aloud", toggleTheme:"Toggle light/dark theme",
+  archives:"Archives", settings:"Settings", refresh:"Refresh",
+  setTranslate:"Translate non-English stories", setCluster:"Cluster duplicate stories", setFont:"Text size",
+  language:"Language", srcHead:"Active sources", srcHint:"(tap to enable/disable)", done:"Done", stop:"Stop",
+  fontSmaller:"Smaller text", fontLarger:"Larger text",
+  foot1:"Stories pulled from the public RSS feeds of the listed outlets — ad-free reading, non-English items translated on the fly.",
+  foot2:"Every story links back to its original source.",
+  footBrand:"Tech & Cyber Daily", foot3:"auto-updates from GitHub"
+},
+fr:{
+  kick:"Édition du jour", searchPh:"Rechercher un article, un sujet, une source…",
+  tipLbl:"Astuce du jour", briefLbl:"À retenir — top 3",
+  menaceLbl:"Niveau de menace :", levels:{0:"Calme",1:"Vigilance",3:"Élevée",6:"Tempête"},
+  alerts1:"{n} alerte", alertsN:"{n} alertes",
+  quizLbl:"Quiz sécurité du jour", qOk:"Correct. ", qKo:"Pas tout à fait. ",
+  chipAll:"Tout", chipFav:"Favoris",
+  count1:"{n} article", countN:"{n} articles", savedSuffix:"enregistrés",
+  noFav1:"Aucun favori", noFav2:"Touche le cœur d'un article pour le garder ici.",
+  noCat1:"Rien dans cette rubrique", noCat2:"Essaie un autre filtre ou une recherche.",
+  noLoad1:"Aucun article chargé", noLoad2:"Vérifie ta connexion, puis touche le bouton d'actualisation.",
+  tracked:"Suivi :", addTopic:"+ suivre un sujet", trackedTopic:"Sujet suivi", saveStory:"Enregistrer l'article",
+  translated:"· traduit", alertPill:"ALERTE", minRead:"{n} min de lecture",
+  rel1:"+{n} source", relN:"+{n} sources",
+  taMin:"il y a {n} min", taHour:"il y a {n} h", taYesterday:"hier", taDay:"il y a {n} j",
+  close:"Fermer", readAloud:"Lire à voix haute", share:"Partager", moreSrc:"Plus de cette source", lessSrc:"Moins de cette source",
+  moreFrom:"Plus de {s}", lessFrom:"Moins de {s}",
+  inShort:"En bref", translating:"Traduction…", loading:"Chargement de l'article…",
+  noFull:"Le texte complet n'a pas pu être extrait — ouvre l'article original ci-dessous.",
+  alsoBy:"Aussi traité par", openSrc:"Source : {s}",
+  linkCopied:"Lien copié", copyLink:"Copie ce lien :",
+  noHist:"Pas encore d'historique — à demain.",
+  podcastIntro:"Voici les sujets du jour. ",
+  updAvail:"La version {v} est disponible", download:"Télécharger", dismiss:"Fermer",
+  podcastMode:"Mode podcast", readBrief:"Lire le résumé à voix haute", toggleTheme:"Changer de thème clair/sombre",
+  archives:"Archives", settings:"Réglages", refresh:"Actualiser",
+  setTranslate:"Traduire les articles non anglais", setCluster:"Regrouper les doublons", setFont:"Taille du texte",
+  language:"Langue", srcHead:"Sources actives", srcHint:"(touche pour activer/désactiver)", done:"Fermer", stop:"Stop",
+  fontSmaller:"Texte plus petit", fontLarger:"Texte plus grand",
+  foot1:"Articles tirés des flux RSS publics des médias listés — lecture sans pub, articles non anglais traduits à la volée.",
+  foot2:"Chaque article renvoie vers sa source d'origine.",
+  footBrand:"Tech & Cyber Daily", foot3:"mise à jour auto depuis GitHub"
+}
+};
+var LANG=(window.PC_LANG&&I18N[window.PC_LANG])?window.PC_LANG:lsGet('tcd_lang','en');
+if(!I18N[LANG])LANG='en';
+function t(k){var o=I18N[LANG]||I18N.en,v=(k in o)?o[k]:I18N.en[k];return (v===undefined)?k:v;}
+function tp(k,n){return t(k).replace('{n}',n);}
+function loc(){return LANG==='fr'?'fr-FR':'en-US';}
+function catLabel(c){var m=CAT_LABEL[LANG]||CAT_LABEL.en;return m[c]||c;}
+function setLang(l){if(!I18N[l])return;LANG=l;lsSet('tcd_lang',l);if(window.AndroidBridge&&AndroidBridge.setLang)AndroidBridge.setLang(l);applyLang();}
+function applyLang(){
+  document.documentElement.lang=LANG;
+  document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'));});
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el){el.setAttribute('placeholder',t(el.getAttribute('data-i18n-ph')));});
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el){var v=t(el.getAttribute('data-i18n-title'));el.setAttribute('title',v);el.setAttribute('aria-label',v);});
+  document.querySelectorAll('.chip').forEach(function(c){var k=c.getAttribute('data-cat');c.textContent=(k==='all')?t('chipAll'):(k==='fav')?t('chipFav'):catLabel(k);});
+  var le=document.getElementById('langEn'),lf=document.getElementById('langFr');
+  if(le&&lf){le.classList.toggle('on',LANG==='en');lf.classList.toggle('on',LANG==='fr');}
+  GLOSS_KEYS=Object.keys(glossDict()).sort(function(a,b){return b.length-a.length;});
+  renderTip();renderQuiz();
+  if(ALL.length){render();renderDigest();updateMenace();renderTopics();}
+}
+
 document.documentElement.style.setProperty('--fs',SETTINGS.fontScale||1);
 /* ================= Filters (accent-insensitive folding) =================
    Keyword lists below intentionally mix French and English: they match
@@ -1254,7 +1352,7 @@ function onFetchDone(id,b64){
   try{var bin=atob(b64),arr=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);p.res(new TextDecoder('utf-8').decode(arr));}catch(e){p.res('');}
 }
 /* ================= Translation (to English) ================= */
-function gtxUrl(q){return 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q='+encodeURIComponent(q);}
+function gtxUrl(q){return 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='+LANG+'&dt=t&q='+encodeURIComponent(q);}
 function translateChunk(arr){
   if(!arr.length) return Promise.resolve([]);
   return bridgeFetch(gtxUrl(arr.join('\n[[[0]]]\n'))).then(function(raw){
@@ -1272,9 +1370,9 @@ function translateTexts(texts){
 var speaking=false;
 function speak(text){
   stopSpeak();
-  if(window.AndroidBridge&&AndroidBridge.speak){AndroidBridge.speak(text);speaking=true;return;}
+  if(window.AndroidBridge&&AndroidBridge.speak){AndroidBridge.speak(text,LANG);speaking=true;return;}
   if(window.speechSynthesis){
-    var u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=1;
+    var u=new SpeechSynthesisUtterance(text);u.lang=loc();u.rate=1;
     u.onend=function(){speaking=false;syncTtsBtns();};
     speechSynthesis.speak(u);speaking=true;
   }
@@ -1289,7 +1387,7 @@ function syncTtsBtns(){
   var rb=document.getElementById('rTts');if(rb)rb.classList.toggle('on',speaking);
 }
 /* ================= Tip of the day ================= */
-var TIPS=[
+var TIPS={en:[
   {t:"Turn on two-factor authentication everywhere you can",x:"A one-time code from an authenticator app stops almost every account takeover, even if your password leaks. Start with your email — it's the key to all your other accounts."},
   {t:"Use a password manager",x:"Bitwarden, 1Password or KeePass generate and remember a unique password for every site. One master password to memorize, and no more domino effect when a single site gets breached."},
   {t:"Don't click links in emails, even \u201cofficial\u201d ones",x:"Phishing imitates your bank, Amazon or the tax office. Check the real link address before clicking; when in doubt, type the site's address yourself."},
@@ -1305,18 +1403,36 @@ var TIPS=[
   {t:"Encrypt your phone and use a solid PIN",x:"Six digits minimum, or biometrics. If your phone gets stolen, your data stays unreadable."},
   {t:"Too good to be true? It's a scam",x:"A €200 iPhone, crypto doubling in a week, a parcel to claim… If it sounds too good, take the time to verify before paying anything."},
   {t:"Only install APKs from trusted sources",x:"Outside the Play Store, an APK can contain anything. Install only what you've verified yourself, and refuse APKs sent by message."}
-];
-(function(){
+],fr:[
+  {t:"Active la double authentification partout",x:"La 2FA (code généré par une appli comme Authy ou Google Authenticator) bloque la quasi-totalité des piratages de compte, même si ton mot de passe fuite. Commence par ta boîte mail : c’est la clé de tous tes autres comptes."},
+  {t:"Un gestionnaire de mots de passe change la vie",x:"Bitwarden ou KeePass génèrent et retiennent un mot de passe unique pour chaque site. Tu n’as qu’un seul mot de passe maître à mémoriser, et plus aucun effet domino en cas de fuite."},
+  {t:"Méfie-toi des liens dans les mails, même « officiels »",x:"Le phishing imite ta banque, Amazon ou les impôts. Avant de cliquer, regarde la vraie adresse du lien. En cas de doute, va sur le site en tapant l’adresse toi-même."},
+  {t:"Mets à jour… vraiment tout",x:"Android, navigateur, applis, box internet. La plupart des piratages exploitent une faille déjà corrigée par une mise à jour que la victime n’avait pas installée."},
+  {t:"Ne branche jamais une clé USB inconnue",x:"Une clé trouvée sur un parking est un grand classique d’attaque : elle peut exécuter un programme malveillant dès l’insertion. Dans le doute, jette-la."},
+  {t:"Sauvegarde selon la règle 3-2-1",x:"3 copies de tes données, sur 2 supports différents, dont 1 hors ligne. C’est ta seule vraie protection contre les rançongiciels."},
+  {t:"Sur le Wi-Fi public, utilise un VPN",x:"Dans un café ou un aéroport, quelqu’un peut intercepter ton trafic. Un VPN chiffre tout. À défaut, évite de te connecter à ta banque sur ces réseaux."},
+  {t:"Vérifie si tes comptes ont fuité",x:"Le site haveibeenpwned.com te dit gratuitement si ton email apparaît dans une fuite de données connue. Si oui : change immédiatement le mot de passe concerné."},
+  {t:"Un mot de passe long bat un mot de passe compliqué",x:"« cheval-orange-tempête-42 » est plus solide et plus facile à retenir que « Xk7!p ». La longueur est ce qui compte le plus contre la force brute."},
+  {t:"Ne réutilise jamais le même mot de passe",x:"Si un site est piraté, les attaquants testent ton couple email/mot de passe partout ailleurs. Un mot de passe unique par site coupe la réaction en chaîne."},
+  {t:"Attention aux QR codes en pleine rue",x:"Le « quishing » : un QR code collé sur un parcmètre ou une terrasse peut rediriger vers un faux site de paiement. Vérifie toujours l’adresse qui s’affiche."},
+  {t:"Regarde les autorisations de tes applis",x:"Pourquoi une lampe torche demande-t-elle l’accès à tes contacts et ta position ? Retire les permissions abusives dans les réglages du téléphone."},
+  {t:"Chiffre ton téléphone et mets un code solide",x:"Un code à 6 chiffres minimum (ou biométrie). Si ton téléphone est volé, tes données restent illisibles."},
+  {t:"Méfie-toi des offres trop belles",x:"iPhone à 200 €, crypto qui double en une semaine, colis à réclamer… Si c’est trop beau, c’est une arnaque. Prends toujours le temps de vérifier."},
+  {t:"N’installe des APK que de sources sûres",x:"En dehors du Play Store, un APK peut contenir n’importe quoi. N’installe que ce que tu as vérifié toi-même, et refuse les APK envoyés par message."}
+]};
+function renderTip(){
   var start=new Date(new Date().getFullYear(),0,0);
   var day=Math.floor((new Date()-start)/86400000);
-  var tip=TIPS[day%TIPS.length];
+  var tips=TIPS[LANG]||TIPS.en;
+  var tip=tips[day%tips.length];
   document.getElementById('tipTitle').textContent=tip.t;
   document.getElementById('tipText').textContent=tip.x;
-  document.getElementById('todaySub').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-})();
+  document.getElementById('todaySub').textContent=new Date().toLocaleDateString(loc(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+renderTip();
 /* ================= Model / rendering ================= */
 var ALL=[],CURRENT='all',QUERY='';
-var CAT_LABEL={cyber:"Cyber",ia:"AI",tech:"Tech",hard:"Hardware"};
+var CAT_LABEL={en:{cyber:"Cyber",ia:"AI",tech:"Tech",hard:"Hardware"},fr:{cyber:"Cyber",ia:"IA",tech:"Tech",hard:"Matériel"}};
 var NOIMG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>';
 var PIN='<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
@@ -1324,9 +1440,9 @@ function imgFallback(el){el.parentNode.innerHTML="<div class='noimg'>"+NOIMG+"</
 function timeAgo(iso){
   if(!iso)return"";var d=new Date(iso);if(isNaN(d))return"";
   var s=(Date.now()-d.getTime())/1000;
-  if(s<3600)return Math.max(1,Math.round(s/60))+" min ago";
-  if(s<86400)return Math.round(s/3600)+" h ago";
-  var days=Math.round(s/86400);return days<=1?"yesterday":days+" d ago";
+  if(s<3600)return tp('taMin',Math.max(1,Math.round(s/60)));
+  if(s<86400)return tp('taHour',Math.round(s/3600));
+  var days=Math.round(s/86400);return days<=1?t('taYesterday'):tp('taDay',days);
 }
 function readMins(a){
   if(a.mins)return a.mins;
@@ -1470,22 +1586,22 @@ function cardHtml(a){
   var b=a.cat||'tech';
   var isFav=!!FAV[a.link],isRead=!!READ[a.link],isPin=(TOPICS.length&&matchesTopics(a)&&CURRENT!=='fav');var sv=severityOf(a);
   var thumb=a.img?"<img src='"+esc(a.img)+"' loading='lazy' referrerpolicy='no-referrer' alt='' onerror=\"imgFallback(this)\">":"<div class='noimg'>"+NOIMG+"</div>";
-  var tr=a.translated?" <span class='tr'>· translated</span>":"";
-  var rel=(a.related&&a.related.length)?"<span class='relnote'>+"+a.related.length+" source"+(a.related.length>1?'s':'')+"</span>":"";
+  var tr=a.translated?" <span class='tr'>"+t('translated')+"</span>":"";
+  var rel=(a.related&&a.related.length)?"<span class='relnote'>"+tp(a.related.length>1?'relN':'rel1',a.related.length)+"</span>":"";
   return "<a class='card"+(isRead?' read':'')+(isPin?' pin':'')+(sv===2?' crit':'')+"' data-link='"+esc(a.link)+"'>"+
-    "<div class='thumb'><span class='badge b-"+b+"'><i class='cdot'></i>"+(CAT_LABEL[b]||'News')+"</span>"+thumb+
-      "<button class='heart"+(isFav?' on':'')+"' data-fav='"+esc(a.link)+"' aria-label='Save story'>"+(isFav?'♥':'♡')+"</button>"+
-      (isPin?"<span class='pinstar' title='Tracked topic'>"+PIN+"</span>":"")+"</div>"+
-    "<div class='body'><div class='meta'><span class='lft'><span class='cat'><i class='cdot c-"+b+"'></i>"+(CAT_LABEL[b]||'News')+"</span>"+(sv===2?"<span class='alertpill'>ALERT</span>":"")+"<span>"+timeAgo(a.date)+"</span></span><span>"+readMins(a)+" min read</span></div>"+
+    "<div class='thumb'><span class='badge b-"+b+"'><i class='cdot'></i>"+catLabel(b)+"</span>"+thumb+
+      "<button class='heart"+(isFav?' on':'')+"' data-fav='"+esc(a.link)+"' aria-label='"+t('saveStory')+"'>"+(isFav?'♥':'♡')+"</button>"+
+      (isPin?"<span class='pinstar' title='"+t('trackedTopic')+"'>"+PIN+"</span>":"")+"</div>"+
+    "<div class='body'><div class='meta'><span class='lft'><span class='cat'><i class='cdot c-"+b+"'></i>"+catLabel(b)+"</span>"+(sv===2?"<span class='alertpill'>"+t('alertPill')+"</span>":"")+"<span>"+timeAgo(a.date)+"</span></span><span>"+tp('minRead',readMins(a))+"</span></div>"+
     "<h3>"+markText(a.title)+"</h3><p class='excerpt'>"+esc(a.excerpt)+(a.excerpt&&a.excerpt.length>=180?'…':'')+"</p>"+
     "<div class='meta foot'><span class='srcname'>"+esc(a.source)+tr+"</span>"+rel+"</div></div></a>";
 }
 function render(){
   var list=visibleList();
-  document.getElementById('count').textContent=list.length+' stor'+(list.length===1?'y':'ies')+(CURRENT==='fav'?' saved':'');
+  document.getElementById('count').textContent=tp(list.length===1?'count1':'countN',list.length)+(CURRENT==='fav'?' '+t('savedSuffix'):'');
   if(!list.length){
     grid.innerHTML='';statusEl.style.display='block';
-    statusEl.innerHTML=CURRENT==='fav'?"<div class='big'>No saved stories</div><div class='hint'>Tap the heart on a story to keep it here.</div>":(ALL.length?"<div class='big'>Nothing in this section</div><div class='hint'>Try another filter or search.</div>":"<div class='big'>No stories loaded</div><div class='hint'>Check your connection, then tap the refresh button.</div>");
+    statusEl.innerHTML=CURRENT==='fav'?"<div class='big'>"+t('noFav1')+"</div><div class='hint'>"+t('noFav2')+"</div>":(ALL.length?"<div class='big'>"+t('noCat1')+"</div><div class='hint'>"+t('noCat2')+"</div>":"<div class='big'>"+t('noLoad1')+"</div><div class='hint'>"+t('noLoad2')+"</div>");
     return;
   }
   statusEl.style.display='none';
@@ -1500,9 +1616,9 @@ function renderDigest(){
 }
 function renderTopics(){
   var el=document.getElementById('topics');
-  var h="<span class='tlab'>Tracked:</span>";
+  var h="<span class='tlab'>"+t('tracked')+"</span>";
   TOPICS.forEach(function(kw){h+="<span class='topic'>"+esc(kw)+"<b data-deltopic='"+esc(kw)+"'>✕</b></span>";});
-  h+="<button class='topic-add' id='addTopic'>+ track a topic</button>";
+  h+="<button class='topic-add' id='addTopic'>"+t('addTopic')+"</button>";
   el.innerHTML=h;
 }
 function showSkeletons(){
@@ -1518,15 +1634,15 @@ function baseU(u){return(u||'').split('?')[0].replace(/-\d+x\d+(\.\w+)$/,'$1');}
 function findByLink(link){for(var i=0;i<ALL.length;i++){if(ALL[i].link===link)return ALL[i];}if(FAV[link])return FAV[link];return null;}
 function renderReader(a){
   var isFav=!!FAV[a.link];
-  var h='<div class="rbar"><button class="rbtn" onclick="closeReader()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button><div class="rgroup">'+
-    '<button class="rbtn'+(speaking?' on':'')+'" id="rTts" onclick="toggleReadAloud()" title="Read aloud" aria-label="Read aloud"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>'+
-    '<button class="rbtn" onclick="shareArticle(readerCur)" title="Share" aria-label="Share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></button>'+
-    '<button class="rbtn" onclick="voteSource(readerCur.source,1);toast(\'More from \'+readerCur.source)" title="More from this source" aria-label="More from this source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>'+
-    '<button class="rbtn" onclick="voteSource(readerCur.source,-1);toast(\'Less from \'+readerCur.source)" title="Less from this source" aria-label="Less from this source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14"/></svg></button>'+
-    '<button class="rbtn fav'+(isFav?' on':'')+'" onclick="toggleFav(readerCur)" aria-label="Save story">'+(isFav?'♥':'♡')+'</button></div></div>';
-  h+='<div class="rmeta"><span class="badge b-'+(a.cat||'tech')+'"><i class="cdot"></i>'+(CAT_LABEL[a.cat]||'News')+'</span><span class="rsrc">'+esc(a.source)+'</span><span>'+timeAgo(a.date)+'</span>'+(a.translated?'<span class="tr">translated</span>':'')+'</div>';
+  var h='<div class="rbar"><button class="rbtn" onclick="closeReader()" aria-label="'+t('close')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button><div class="rgroup">'+
+    '<button class="rbtn'+(speaking?' on':'')+'" id="rTts" onclick="toggleReadAloud()" title="'+t('readAloud')+'" aria-label="'+t('readAloud')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>'+
+    '<button class="rbtn" onclick="shareArticle(readerCur)" title="'+t('share')+'" aria-label="'+t('share')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></button>'+
+    '<button class="rbtn" onclick="voteSource(readerCur.source,1);toast(\'More from \'+readerCur.source)" title="'+t('moreSrc')+'" aria-label="'+t('moreSrc')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>'+
+    '<button class="rbtn" onclick="voteSource(readerCur.source,-1);toast(\'Less from \'+readerCur.source)" title="'+t('lessSrc')+'" aria-label="'+t('lessSrc')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14"/></svg></button>'+
+    '<button class="rbtn fav'+(isFav?' on':'')+'" onclick="toggleFav(readerCur)" aria-label="'+t('saveStory')+'">'+(isFav?'♥':'♡')+'</button></div></div>';
+  h+='<div class="rmeta"><span class="badge b-'+(a.cat||'tech')+'"><i class="cdot"></i>'+catLabel(a.cat||'tech')+'</span><span class="rsrc">'+esc(a.source)+'</span><span>'+timeAgo(a.date)+'</span>'+(a.translated?'<span class="tr">translated</span>':'')+'</div>';
   h+='<h2 class="rtitle">'+markText(a.title)+'</h2>';
-  h+='<div class="rtime">'+readMins(a)+' min read</div>';
+  h+='<div class="rtime">'+tp('minRead',readMins(a))+'</div>';
   if(a.img)h+='<img src="'+esc(a.img)+'" referrerpolicy="no-referrer" onerror="this.remove()">';
   var seen=[baseU(a.img)];
   if(a.blocks&&a.blocks.length){
@@ -1535,20 +1651,20 @@ function renderReader(a){
       else if(bk.t==='h'){h+='<h3>'+markText(bk.v)+'</h3>';}
       else{h+='<p>'+markText(bk.v)+'</p>';}
     });
-    if(a.lang!=='en'&&!a.bodyTranslated){h+='<div class="rload">Translating…</div>';}
+    if(a.lang!==LANG&&!a.bodyTranslated){h+='<div class="rload">'+t('translating')+'</div>';}
   } else if(a.blocks!==null){
-    h+='<p>'+esc(a.excerpt)+'…</p><p class="rnote">The full text could not be extracted — open the original story below.</p>';
-  } else { h+='<div class="rload">Loading story…</div>'; }
+    h+='<p>'+esc(a.excerpt)+'…</p><p class="rnote">'+t('noFull')+'</p>';
+  } else { h+='<div class="rload">'+t('loading')+'</div>'; }
   if(a.related&&a.related.length){
-    h+='<div class="rrelated"><div class="rl">Also covered by</div>';
+    h+='<div class="rrelated"><div class="rl">'+t('alsoBy')+'</div>';
     a.related.forEach(function(r){h+='<a href="'+esc(r.link)+'" target="_blank" rel="noopener">'+esc(r.source)+' ↗</a>';});
     h+='</div>';
   }
-  h+='<br><a class="rsource" href="'+esc(a.link)+'" target="_blank" rel="noopener">Open source: '+esc(a.source)+' ↗</a>';
+  h+='<br><a class="rsource" href="'+esc(a.link)+'" target="_blank" rel="noopener">'+t('openSrc').replace('{s}',esc(a.source))+' ↗</a>';
   readerEl.innerHTML=h;enhanceReader();
 }
 function translateBody(a,done){
-  if(a.lang==='en'||a.bodyTranslated||!a.blocks||!a.blocks.length){done();return;}
+  if(a.lang===LANG||a.bodyTranslated||!a.blocks||!a.blocks.length){done();return;}
   var idx=[],texts=[];a.blocks.forEach(function(b,i){if(b.t!=='img'){idx.push(i);texts.push(b.v);}});
   if(!texts.length){a.bodyTranslated=true;done();return;}
   translateTexts(texts).then(function(tr){for(var m=0;m<idx.length&&m<tr.length;m++){a.blocks[idx[m]].v=tr[m];}a.bodyTranslated=true;a.translated=true;done();});
@@ -1623,6 +1739,8 @@ document.getElementById('tgTranslate').addEventListener('click',function(){SETTI
 document.getElementById('tgCluster').addEventListener('click',function(){SETTINGS.cluster=!SETTINGS.cluster;lsSet('tcd_settings',SETTINGS);this.classList.toggle('on',SETTINGS.cluster);});
 document.getElementById('fsPlus').addEventListener('click',function(){SETTINGS.fontScale=Math.min(1.4,(SETTINGS.fontScale||1)+0.1);applyFont();});
 document.getElementById('fsMinus').addEventListener('click',function(){SETTINGS.fontScale=Math.max(0.85,(SETTINGS.fontScale||1)-0.1);applyFont();});
+document.getElementById('langEn').addEventListener('click',function(){setLang('en');});
+document.getElementById('langFr').addEventListener('click',function(){setLang('fr');});
 function applyFont(){document.documentElement.style.setProperty('--fs',SETTINGS.fontScale);lsSet('tcd_settings',SETTINGS);}
 document.getElementById('srcGrid').addEventListener('click',function(e){
   var t=e.target.closest('.srctag');if(!t)return;
@@ -1633,7 +1751,7 @@ document.getElementById('srcGrid').addEventListener('click',function(e){
 document.getElementById('ttsAllBtn').addEventListener('click',function(){
   if(speaking){stopSpeak();return;}
   var top=ALL.slice(0,5);if(!top.length)return;
-  var txt="Here are today's top stories. "+top.map(function(a,i){return (i+1)+'. '+a.title+'.';}).join(' ');
+  var txt=t('podcastIntro')+top.map(function(a,i){return (i+1)+'. '+a.title+'.';}).join(' ');
   speak(txt);syncTtsBtns();
 });
 document.getElementById('refreshBtn').addEventListener('click',load);
@@ -1649,7 +1767,7 @@ function normalize(items){
 function afterData(){render();renderDigest();saveHistory();}
 function translateCards(){
   if(!SETTINGS.translate)return;
-  var fr=ALL.filter(function(a){return a.lang!=='en'&&!a.translated;});
+  var fr=ALL.filter(function(a){return a.lang!==LANG&&!a.translated;});
   if(!fr.length)return;
   var texts=[];fr.forEach(function(a){texts.push(a.title);texts.push(a.excerpt);});
   translateTexts(texts).then(function(tr){fr.forEach(function(a,i){if(tr[i*2]!==undefined&&tr[i*2]){a.title=tr[i*2];a.excerpt=tr[i*2+1]||a.excerpt;a.translated=true;}});afterData();saveCache();});
@@ -1680,9 +1798,10 @@ function load(){
 }
 renderTopics();
 /* ============ Extras: threat level, glossary, TL;DR, podcast, theme, votes, history, share, quiz ============ */
-var GLOSSARY={"ransomware":"Malware that encrypts your files and demands a payment to unlock them.","phishing":"A scam using fake emails or messages to trick you into handing over passwords or bank details.","0-day":"A brand-new vulnerability, still unknown to the vendor, that attackers exploit before a patch exists.","rce":"A flaw that lets an attacker run their own code remotely on your machine or server.","vpn":"A tool that creates an encrypted tunnel over the internet to hide your location and protect your connection.","encryption":"Scrambling data into unreadable code that only someone with the key can read again.","ddos":"An attack that floods a site with connections to overwhelm it and knock it offline.","malware":"Any program designed to damage, spy on or hack a device.","cve":"The official ID given to a known vulnerability so everyone can refer to it consistently.","gdpr":"The EU law that controls how companies collect and use your personal data.","generative ai":"AI that creates new content — text, images, music — rather than just sorting existing data.","llm":"A large language model: AI trained on huge amounts of text to understand and write language.","cloud":"Storing files and running software on remote servers over the internet instead of on your own device.","api":"A gateway that lets two programs talk to each other and exchange data automatically.","open source":"Software whose code is public, so anyone can inspect, use and modify it.","firewall":"A security barrier that filters connections to block unwanted access to a network or device.","two-factor authentication":"A second proof of identity on top of your password, such as a code from your phone.","trojan horse":"A program that looks legitimate but secretly hides a virus or spyware.","spyware":"Software that installs itself discreetly to monitor your activity and steal information.","botnet":"A network of infected computers controlled remotely by an attacker to launch mass attacks.","data breach":"A situation where private or sensitive information gets exposed or stolen, usually after a hack.","exploit":"Code that takes advantage of a flaw to hack a system or take control of it.","patch":"A small update released by a vendor to fix a bug or close a security hole.","backdoor":"A hidden access point left in software that lets someone bypass normal security.","brute force":"An attack that automatically tries thousands of combinations until it finds the right password.","https":"The secure version of a website, which encrypts the traffic between your browser and the site.","cookie":"A small file a site stores on your device to recognize you and track your browsing.","deepfake":"A fake video or voice made with AI to make someone appear to say or do something they didn't.","blockchain":"A shared, tamper-proof digital ledger that records transactions transparently.","cryptocurrency":"Digital money, like bitcoin, that works without a bank thanks to blockchain technology.","bug bounty":"A program that pays researchers for finding and reporting security flaws in software.","hacker":"Someone highly skilled with computers who looks for ways around a system's protections.","dark web":"A hidden part of the internet, reachable only with special tools, often used for illegal activity.","captcha":"A small test (images or letters) that proves you're human, not a bot.","sandbox":"An isolated, secure environment where you can run a suspicious program without risking the rest of your system.","machine learning":"A branch of AI where a program learns on its own from examples and data.","algorithm":"A step-by-step set of instructions a computer follows to solve a problem or complete a task.","token":"A digital key used temporarily to prove your identity or represent value online.","spam":"Unwanted messages sent in bulk, usually advertising or scams.","computer worm":"A virus that copies itself and spreads from one computer to another without human help.","social engineering":"Psychological manipulation that tricks someone into revealing information or making a security mistake.","chatbot":"A program that chats with you automatically to answer questions or help with a task.","prompt":"The instruction or question you give an AI to get a response.","zero-day":"A fresh vulnerability, unknown to the vendor, exploited by attackers before a fix exists.","cyberattack":"A malicious attempt to steal, damage or disrupt data or computer systems."};
-var GLOSS_KEYS=Object.keys(GLOSSARY).sort(function(a,b){return b.length-a.length;});
-var QUIZ=[{"q":"Which password is the strongest?","options":["password123","I like coffee at 7 in the morning!","azerty"],"correct":1,"explain":"A long passphrase mixing words, numbers and symbols is far harder to guess than a short or common word."},{"q":"What is two-factor authentication (2FA)?","options":["Using two different passwords","Adding a second proof of identity, like a code sent to your phone","Changing your password twice a year"],"correct":1,"explain":"2FA combines something you know (password) with something you have (a code or app), which blocks most account takeovers."},{"q":"You get an urgent email from your bank asking for your credentials via a link. What do you do?","options":["Click quickly so your account isn't locked","Ignore the link and contact the bank through its official website or number","Reply with your credentials"],"correct":1,"explain":"That's a classic phishing attempt. A bank never asks for credentials by email — always go through the official channel."},{"q":"Why install security updates?","options":["To get new icon colors","To fix vulnerabilities that attackers exploit","Only to free up disk space"],"correct":1,"explain":"Updates close known vulnerabilities. Delaying one leaves the door open to attacks."},{"q":"What is a VPN mainly for?","options":["Making the internet faster in all cases","Encrypting your connection and hiding your IP address","Deleting viruses"],"correct":1,"explain":"A VPN encrypts your traffic and masks your IP — useful on untrusted networks — but it's not an antivirus and won't speed things up."},{"q":"What's the recommended way to back up important data?","options":["A single copy on your computer is enough","The 3-2-1 rule: three copies, two media, one off-site","Back up only once a year"],"correct":1,"explain":"The 3-2-1 rule protects against hardware failure, theft and ransomware by keeping several copies, one of them off-site or in the cloud."},{"q":"An unknown site tells you that you've won an iPhone. What do you do?","options":["Enter your bank details to pay the shipping fee","Close the page: it's a scam","Share the link with your friends"],"correct":1,"explain":"Fake prize claims are designed to steal your data or money. If it's too good to be true, it's a scam."},{"q":"On free public Wi-Fi, what's the safest attitude?","options":["Do your banking without a care","Avoid sensitive sites or use a VPN","Disable your phone's lock screen"],"correct":1,"explain":"Public networks can be monitored. Avoid sensitive activity or encrypt your traffic with a VPN."},{"q":"A flashlight app asks for access to your contacts and microphone. What do you do?","options":["Accept — all apps need it","Deny: those permissions have nothing to do with its purpose","Uninstall your antivirus"],"correct":1,"explain":"Permissions should match the app's function. Unjustified requests are a red flag."},{"q":"Should you reuse the same password on several sites?","options":["Yes, it's easier to remember","No — a breached site would expose all your accounts","Yes, if the password is long"],"correct":1,"explain":"With a unique password per site, a breach at one service doesn't compromise the others. A password manager helps you manage them."},{"q":"How do you recognize a safer website for paying?","options":["The address starts with https and the site name is spelled correctly","The site has lots of flashing ads","It only accepts wire transfers to an individual"],"correct":0,"explain":"https means an encrypted connection, but above all check the exact domain spelling — scammers imitate real sites."},{"q":"What is a password manager?","options":["Software that creates and stores strong passwords","A paper notebook next to the computer","A service that shares your passwords publicly"],"correct":0,"explain":"It generates and remembers unique, complex passwords, all protected by a single master password you memorize."},{"q":"A text message says a parcel is held and asks you to pay via a link. Reaction?","options":["Pay right away, it's only a few euros","Don't click — check on the carrier's official website","Call the number back and give your card details"],"correct":1,"explain":"Smishing (SMS phishing) imitates delivery companies. Always verify through the official app or website, never through the link you received."},{"q":"What should you do with an old phone before selling it?","options":["Sell it as is, faster that way","Wipe the data and factory-reset it","Just change the wallpaper"],"correct":1,"explain":"A factory reset removes your accounts, photos and personal data so they don't fall into the wrong hands."},{"q":"App-based 2FA (authenticator) is generally...","options":["Less secure than nothing at all","Safer than SMS codes","Useless if you have a good password"],"correct":1,"explain":"Authenticator apps resist SIM-swap attacks better than codes sent by SMS."},{"q":"A friend sends you a strange message with an urgent link on social media. What should you suspect?","options":["Their account may have been hacked","It's definitely them, so just click","The link is safe because it came from a friend"],"correct":0,"explain":"Hacked accounts are used to spread malicious links. Verify with the person through another channel before clicking."},{"q":"Why avoid sharing everything publicly on social media?","options":["It slows down your phone","That information helps scammers target you or steal your identity","It drains too much battery"],"correct":1,"explain":"Published dates, places and habits make targeted scams and identity theft easier. Limit what's publicly visible."},{"q":"You find a USB drive on the ground. Good idea to plug it in?","options":["Yes, to find the owner","No — it may contain malware","Yes, if it looks nice"],"correct":1,"explain":"An unknown drive can infect your device the moment it's connected. Never plug in media you don't trust."},{"q":"What is ransomware?","options":["An online video game","A program that encrypts your files and demands a ransom","A disk-cleaning tool"],"correct":1,"explain":"Ransomware locks you out of your data until you pay. Good backups let you restore without giving in to blackmail."},{"q":"How do you spot a phishing email?","options":["Spelling mistakes, a suspicious sender address and a sense of urgency","It always contains a PDF attachment","It only arrives on weekends"],"correct":0,"explain":"Errors, odd addresses, urgency and suspicious links are classic phishing signs."},{"q":"Should you accept friend requests from strangers online?","options":["Yes, the more contacts the better","No — a fake profile may be trying to scam you","Yes, if they have a nice photo"],"correct":1,"explain":"Fake profiles are used for romance scams or to harvest your data. Only accept people you actually know."},{"q":"Why lock your phone with a PIN or biometrics?","options":["It improves photo quality","It protects your data if the device is lost or stolen","It increases storage space"],"correct":1,"explain":"A lock screen keeps messages, accounts and payment apps out of reach if the phone is lost or stolen."},{"q":"Someone calls you pretending to be Microsoft tech support. What do you do?","options":["Give them remote access to your computer","Hang up: Microsoft doesn't call individuals like that","Give them your Windows password"],"correct":1,"explain":"That's a fake-support scam. Never give remote access or credentials to an unsolicited call."},{"q":"Where should you download mobile apps from?","options":["The official stores (App Store, Google Play)","Any link received by message","An unknown site offering the free version"],"correct":0,"explain":"Official stores vet apps. Files installed outside them can contain malware."},{"q":"An email has an unexpected attachment named invoice.exe. What do you do?","options":["Open it to see what it is","Don't open it: an unexpected .exe is highly suspicious","Forward it to your whole family"],"correct":1,"explain":"Unsolicited executable attachments are a common virus vector. When in doubt, don't open it — delete it."}];
+var GLOSSARY={en:{"ransomware":"Malware that encrypts your files and demands a payment to unlock them.","phishing":"A scam using fake emails or messages to trick you into handing over passwords or bank details.","0-day":"A brand-new vulnerability, still unknown to the vendor, that attackers exploit before a patch exists.","rce":"A flaw that lets an attacker run their own code remotely on your machine or server.","vpn":"A tool that creates an encrypted tunnel over the internet to hide your location and protect your connection.","encryption":"Scrambling data into unreadable code that only someone with the key can read again.","ddos":"An attack that floods a site with connections to overwhelm it and knock it offline.","malware":"Any program designed to damage, spy on or hack a device.","cve":"The official ID given to a known vulnerability so everyone can refer to it consistently.","gdpr":"The EU law that controls how companies collect and use your personal data.","generative ai":"AI that creates new content — text, images, music — rather than just sorting existing data.","llm":"A large language model: AI trained on huge amounts of text to understand and write language.","cloud":"Storing files and running software on remote servers over the internet instead of on your own device.","api":"A gateway that lets two programs talk to each other and exchange data automatically.","open source":"Software whose code is public, so anyone can inspect, use and modify it.","firewall":"A security barrier that filters connections to block unwanted access to a network or device.","two-factor authentication":"A second proof of identity on top of your password, such as a code from your phone.","trojan horse":"A program that looks legitimate but secretly hides a virus or spyware.","spyware":"Software that installs itself discreetly to monitor your activity and steal information.","botnet":"A network of infected computers controlled remotely by an attacker to launch mass attacks.","data breach":"A situation where private or sensitive information gets exposed or stolen, usually after a hack.","exploit":"Code that takes advantage of a flaw to hack a system or take control of it.","patch":"A small update released by a vendor to fix a bug or close a security hole.","backdoor":"A hidden access point left in software that lets someone bypass normal security.","brute force":"An attack that automatically tries thousands of combinations until it finds the right password.","https":"The secure version of a website, which encrypts the traffic between your browser and the site.","cookie":"A small file a site stores on your device to recognize you and track your browsing.","deepfake":"A fake video or voice made with AI to make someone appear to say or do something they didn't.","blockchain":"A shared, tamper-proof digital ledger that records transactions transparently.","cryptocurrency":"Digital money, like bitcoin, that works without a bank thanks to blockchain technology.","bug bounty":"A program that pays researchers for finding and reporting security flaws in software.","hacker":"Someone highly skilled with computers who looks for ways around a system's protections.","dark web":"A hidden part of the internet, reachable only with special tools, often used for illegal activity.","captcha":"A small test (images or letters) that proves you're human, not a bot.","sandbox":"An isolated, secure environment where you can run a suspicious program without risking the rest of your system.","machine learning":"A branch of AI where a program learns on its own from examples and data.","algorithm":"A step-by-step set of instructions a computer follows to solve a problem or complete a task.","token":"A digital key used temporarily to prove your identity or represent value online.","spam":"Unwanted messages sent in bulk, usually advertising or scams.","computer worm":"A virus that copies itself and spreads from one computer to another without human help.","social engineering":"Psychological manipulation that tricks someone into revealing information or making a security mistake.","chatbot":"A program that chats with you automatically to answer questions or help with a task.","prompt":"The instruction or question you give an AI to get a response.","zero-day":"A fresh vulnerability, unknown to the vendor, exploited by attackers before a fix exists.","cyberattack":"A malicious attempt to steal, damage or disrupt data or computer systems."},fr:{"ransomware":"Logiciel malveillant qui bloque ou verrouille vos fichiers et réclame une rançon en argent pour vous les rendre.","phishing":"Arnaque par faux e-mail ou faux message qui vous pousse à donner vos mots de passe ou vos informations bancaires.","0-day":"Faille de sécurité toute nouvelle, encore inconnue de l’éditeur, que les pirates exploitent avant qu’un correctif existe.","rce":"Faille qui permet à un pirate de faire tourner ses propres programmes à distance sur votre ordinateur ou serveur.","vpn":"Outil qui crée un tunnel sécurisé sur Internet pour masquer votre position et protéger votre connexion.","chiffrement":"Technique qui transforme des données en code illisible, que seule une personne possédant la clé peut relire.","ddos":"Attaque qui inonde un site de connexions pour le saturer et le rendre inaccessible.","malware":"Terme général pour tout programme nuisible conçu pour endommager, espionner ou pirater un appareil.","cve":"Numéro officiel donné à une faille de sécurité connue pour que tout le monde puisse l’identifier facilement.","rgpd":"Loi européenne qui encadre la manière dont les entreprises collectent et utilisent vos données personnelles.","ia générative":"Intelligence artificielle capable de créer du contenu inédit comme du texte, des images ou de la musique.","llm":"Grand modèle d’intelligence artificielle entraîné sur d’énormes quantités de texte pour comprendre et écrire du langage.","cloud":"Le fait de stocker ses fichiers et d’utiliser des logiciels sur des serveurs distants via Internet, plutôt que sur son propre appareil.","api":"Passerelle technique qui permet à deux logiciels de se parler et d’échanger des données automatiquement.","open source":"Logiciel dont le code est public et que chacun peut consulter, utiliser et modifier librement.","pare-feu":"Barrière de sécurité qui filtre les connexions pour bloquer les accès indésirables à un réseau ou un appareil.","authentification à deux facteurs":"Sécurité qui demande, en plus du mot de passe, une deuxième preuve comme un code reçu sur votre téléphone.","cheval de troie":"Programme qui se fait passer pour un logiciel normal mais cache en réalité un virus ou un espion.","spyware":"Logiciel espion qui s’installe discrètement pour surveiller votre activité et voler vos informations.","botnet":"Réseau d’ordinateurs infectés et contrôlés à distance par un pirate pour mener des attaques en masse.","fuite de données":"Situation où des informations privées ou sensibles se retrouvent exposées ou volées, souvent après un piratage.","exploit":"Programme ou astuce qui profite d’une faille pour pirater un système ou en prendre le contrôle.","correctif":"Petite mise à jour publiée par un éditeur pour réparer un bug ou boucher une faille de sécurité.","porte dérobée":"Accès caché laissé dans un logiciel qui permet d’entrer dans un système en contournant la sécurité normale.","force brute":"Méthode de piratage qui essaie automatiquement des milliers de combinaisons jusqu’à trouver le bon mot de passe.","https":"Version sécurisée des sites web qui chiffre les échanges entre votre navigateur et le site visité.","cookie":"Petit fichier déposé par un site sur votre appareil pour vous reconnaître et suivre votre navigation.","deepfake":"Fausse vidéo ou fausse voix créée par intelligence artificielle pour faire dire ou faire faire n’importe quoi à une personne.","blockchain":"Registre numérique partagé et infalsifiable qui enregistre des transactions de façon transparente et sécurisée.","cryptomonnaie":"Monnaie numérique, comme le bitcoin, qui fonctionne sans banque grâce à la technologie blockchain.","bug bounty":"Programme qui récompense financièrement les personnes qui découvrent et signalent des failles dans un logiciel.","hacker":"Personne très douée en informatique qui cherche à contourner ou exploiter les protections d’un système.","dark web":"Partie cachée d’Internet, accessible avec des outils spéciaux, où circulent notamment des activités illégales.","captcha":"Petit test en ligne (images ou lettres) qui vérifie que vous êtes un humain et non un robot.","sandbox":"Espace isolé et sécurisé où l’on peut tester un programme suspect sans risque pour le reste du système.","machine learning":"Branche de l’intelligence artificielle où un programme apprend tout seul à partir d’exemples et de données.","algorithme":"Suite d’instructions qu’un ordinateur suit étape par étape pour résoudre un problème ou accomplir une tâche.","token":"Jeton numérique servant de clé temporaire pour prouver son identité ou représenter une valeur en ligne.","spam":"Courrier ou message indésirable envoyé en masse, souvent publicitaire ou frauduleux.","ver informatique":"Virus capable de se copier tout seul et de se propager d’un ordinateur à l’autre sans intervention humaine.","ingénierie sociale":"Manipulation psychologique qui pousse une personne à révéler des informations ou à commettre une erreur de sécurité.","chatbot":"Programme qui dialogue automatiquement avec vous par messages, pour répondre à des questions ou vous aider.","prompt":"Instruction ou question que l’on écrit à une intelligence artificielle pour obtenir une réponse.","zero-day":"Faille toute neuve, encore inconnue de l’éditeur, exploitée par les pirates avant qu’un correctif n’existe.","cyberattaque":"Tentative malveillante de voler, endommager ou bloquer des données ou des systèmes informatiques."}};
+function glossDict(){return GLOSSARY[LANG]||GLOSSARY.en;}
+var GLOSS_KEYS=Object.keys(glossDict()).sort(function(a,b){return b.length-a.length;});
+var QUIZ={en:[{"q":"Which password is the strongest?","options":["password123","I like coffee at 7 in the morning!","azerty"],"correct":1,"explain":"A long passphrase mixing words, numbers and symbols is far harder to guess than a short or common word."},{"q":"What is two-factor authentication (2FA)?","options":["Using two different passwords","Adding a second proof of identity, like a code sent to your phone","Changing your password twice a year"],"correct":1,"explain":"2FA combines something you know (password) with something you have (a code or app), which blocks most account takeovers."},{"q":"You get an urgent email from your bank asking for your credentials via a link. What do you do?","options":["Click quickly so your account isn't locked","Ignore the link and contact the bank through its official website or number","Reply with your credentials"],"correct":1,"explain":"That's a classic phishing attempt. A bank never asks for credentials by email — always go through the official channel."},{"q":"Why install security updates?","options":["To get new icon colors","To fix vulnerabilities that attackers exploit","Only to free up disk space"],"correct":1,"explain":"Updates close known vulnerabilities. Delaying one leaves the door open to attacks."},{"q":"What is a VPN mainly for?","options":["Making the internet faster in all cases","Encrypting your connection and hiding your IP address","Deleting viruses"],"correct":1,"explain":"A VPN encrypts your traffic and masks your IP — useful on untrusted networks — but it's not an antivirus and won't speed things up."},{"q":"What's the recommended way to back up important data?","options":["A single copy on your computer is enough","The 3-2-1 rule: three copies, two media, one off-site","Back up only once a year"],"correct":1,"explain":"The 3-2-1 rule protects against hardware failure, theft and ransomware by keeping several copies, one of them off-site or in the cloud."},{"q":"An unknown site tells you that you've won an iPhone. What do you do?","options":["Enter your bank details to pay the shipping fee","Close the page: it's a scam","Share the link with your friends"],"correct":1,"explain":"Fake prize claims are designed to steal your data or money. If it's too good to be true, it's a scam."},{"q":"On free public Wi-Fi, what's the safest attitude?","options":["Do your banking without a care","Avoid sensitive sites or use a VPN","Disable your phone's lock screen"],"correct":1,"explain":"Public networks can be monitored. Avoid sensitive activity or encrypt your traffic with a VPN."},{"q":"A flashlight app asks for access to your contacts and microphone. What do you do?","options":["Accept — all apps need it","Deny: those permissions have nothing to do with its purpose","Uninstall your antivirus"],"correct":1,"explain":"Permissions should match the app's function. Unjustified requests are a red flag."},{"q":"Should you reuse the same password on several sites?","options":["Yes, it's easier to remember","No — a breached site would expose all your accounts","Yes, if the password is long"],"correct":1,"explain":"With a unique password per site, a breach at one service doesn't compromise the others. A password manager helps you manage them."},{"q":"How do you recognize a safer website for paying?","options":["The address starts with https and the site name is spelled correctly","The site has lots of flashing ads","It only accepts wire transfers to an individual"],"correct":0,"explain":"https means an encrypted connection, but above all check the exact domain spelling — scammers imitate real sites."},{"q":"What is a password manager?","options":["Software that creates and stores strong passwords","A paper notebook next to the computer","A service that shares your passwords publicly"],"correct":0,"explain":"It generates and remembers unique, complex passwords, all protected by a single master password you memorize."},{"q":"A text message says a parcel is held and asks you to pay via a link. Reaction?","options":["Pay right away, it's only a few euros","Don't click — check on the carrier's official website","Call the number back and give your card details"],"correct":1,"explain":"Smishing (SMS phishing) imitates delivery companies. Always verify through the official app or website, never through the link you received."},{"q":"What should you do with an old phone before selling it?","options":["Sell it as is, faster that way","Wipe the data and factory-reset it","Just change the wallpaper"],"correct":1,"explain":"A factory reset removes your accounts, photos and personal data so they don't fall into the wrong hands."},{"q":"App-based 2FA (authenticator) is generally...","options":["Less secure than nothing at all","Safer than SMS codes","Useless if you have a good password"],"correct":1,"explain":"Authenticator apps resist SIM-swap attacks better than codes sent by SMS."},{"q":"A friend sends you a strange message with an urgent link on social media. What should you suspect?","options":["Their account may have been hacked","It's definitely them, so just click","The link is safe because it came from a friend"],"correct":0,"explain":"Hacked accounts are used to spread malicious links. Verify with the person through another channel before clicking."},{"q":"Why avoid sharing everything publicly on social media?","options":["It slows down your phone","That information helps scammers target you or steal your identity","It drains too much battery"],"correct":1,"explain":"Published dates, places and habits make targeted scams and identity theft easier. Limit what's publicly visible."},{"q":"You find a USB drive on the ground. Good idea to plug it in?","options":["Yes, to find the owner","No — it may contain malware","Yes, if it looks nice"],"correct":1,"explain":"An unknown drive can infect your device the moment it's connected. Never plug in media you don't trust."},{"q":"What is ransomware?","options":["An online video game","A program that encrypts your files and demands a ransom","A disk-cleaning tool"],"correct":1,"explain":"Ransomware locks you out of your data until you pay. Good backups let you restore without giving in to blackmail."},{"q":"How do you spot a phishing email?","options":["Spelling mistakes, a suspicious sender address and a sense of urgency","It always contains a PDF attachment","It only arrives on weekends"],"correct":0,"explain":"Errors, odd addresses, urgency and suspicious links are classic phishing signs."},{"q":"Should you accept friend requests from strangers online?","options":["Yes, the more contacts the better","No — a fake profile may be trying to scam you","Yes, if they have a nice photo"],"correct":1,"explain":"Fake profiles are used for romance scams or to harvest your data. Only accept people you actually know."},{"q":"Why lock your phone with a PIN or biometrics?","options":["It improves photo quality","It protects your data if the device is lost or stolen","It increases storage space"],"correct":1,"explain":"A lock screen keeps messages, accounts and payment apps out of reach if the phone is lost or stolen."},{"q":"Someone calls you pretending to be Microsoft tech support. What do you do?","options":["Give them remote access to your computer","Hang up: Microsoft doesn't call individuals like that","Give them your Windows password"],"correct":1,"explain":"That's a fake-support scam. Never give remote access or credentials to an unsolicited call."},{"q":"Where should you download mobile apps from?","options":["The official stores (App Store, Google Play)","Any link received by message","An unknown site offering the free version"],"correct":0,"explain":"Official stores vet apps. Files installed outside them can contain malware."},{"q":"An email has an unexpected attachment named invoice.exe. What do you do?","options":["Open it to see what it is","Don't open it: an unexpected .exe is highly suspicious","Forward it to your whole family"],"correct":1,"explain":"Unsolicited executable attachments are a common virus vector. When in doubt, don't open it — delete it."}],fr:[{"q":"Quel mot de passe est le plus sûr ?","options":["motdepasse123","J'aime le café à 7h du matin !","azerty"],"correct":1,"explain":"Une phrase de passe longue, mêlant mots, chiffres et symboles, est bien plus difficile à deviner qu'un mot court ou courant."},{"q":"Que signifie l'authentification à deux facteurs (2FA) ?","options":["Utiliser deux mots de passe différents","Ajouter une deuxième preuve d'identité, comme un code sur le téléphone","Changer de mot de passe deux fois par an"],"correct":1,"explain":"La 2FA combine quelque chose que vous savez (mot de passe) avec quelque chose que vous avez (code, application, clé), ce qui bloque la plupart des piratages."},{"q":"Vous recevez un e-mail urgent de votre banque demandant vos identifiants via un lien. Que faites-vous ?","options":["Vous cliquez vite pour ne pas bloquer le compte","Vous ignorez le lien et contactez la banque par le site ou numéro officiel","Vous répondez avec vos identifiants"],"correct":1,"explain":"C'est une tentative de phishing typique. Une banque ne demande jamais vos identifiants par e-mail ; passez toujours par le canal officiel."},{"q":"Pourquoi faut-il installer les mises à jour de sécurité ?","options":["Pour avoir de nouvelles couleurs d'icônes","Pour corriger des failles que les pirates exploitent","Uniquement pour gagner de l'espace disque"],"correct":1,"explain":"Les mises à jour bouchent des vulnérabilités connues. Retarder une mise à jour laisse une porte ouverte aux attaques."},{"q":"À quoi sert principalement un VPN ?","options":["À rendre Internet plus rapide en toutes circonstances","À chiffrer votre connexion et masquer votre adresse IP","À supprimer définitivement les virus"],"correct":1,"explain":"Un VPN chiffre le trafic et cache votre IP, utile sur les réseaux non sûrs, mais ce n'est pas un antivirus et il n'accélère pas la connexion."},{"q":"Quelle est la bonne pratique pour les sauvegardes de données importantes ?","options":["Une seule copie sur l'ordinateur suffit","Appliquer la règle 3-2-1 : trois copies, deux supports, une hors site","Ne sauvegarder qu'une fois par an"],"correct":1,"explain":"La règle 3-2-1 protège contre la panne, le vol et les rançongiciels en gardant plusieurs copies dont une hors du domicile ou dans le cloud."},{"q":"Un site inconnu vous annonce que vous avez gagné un iPhone. Que faites-vous ?","options":["Vous saisissez vos coordonnées bancaires pour les frais de livraison","Vous fermez la page : c'est une arnaque","Vous partagez le lien à vos amis"],"correct":1,"explain":"Les faux gains servent à voler vos données ou votre argent. Si c'est trop beau pour être vrai, c'est une arnaque."},{"q":"Sur un Wi-Fi public gratuit, quelle attitude est la plus prudente ?","options":["Faire ses opérations bancaires sans précaution","Éviter les sites sensibles ou utiliser un VPN","Désactiver le verrouillage de son téléphone"],"correct":1,"explain":"Les réseaux publics peuvent être surveillés. Évitez les données sensibles ou chiffrez votre trafic avec un VPN."},{"q":"Une application lampe de poche demande l'accès à vos contacts et micro. Que faire ?","options":["Accepter, toutes les applis en ont besoin","Refuser : ces permissions n'ont aucun rapport avec sa fonction","Désinstaller votre antivirus"],"correct":1,"explain":"Une permission doit être cohérente avec la fonction de l'appli. Des demandes injustifiées sont un signal d'alerte."},{"q":"Faut-il réutiliser le même mot de passe sur plusieurs sites ?","options":["Oui, c'est plus simple à retenir","Non, un site piraté exposerait tous vos comptes","Oui, si le mot de passe est long"],"correct":1,"explain":"Avec un mot de passe unique par site, la fuite d'un service ne compromet pas les autres. Un gestionnaire de mots de passe aide à les gérer."},{"q":"Comment reconnaître un site web plus sûr pour un paiement ?","options":["L'adresse commence par https et le nom du site est correct","Le site a beaucoup de publicités clignotantes","Il propose uniquement le virement à un particulier"],"correct":0,"explain":"Le https indique une connexion chiffrée, mais vérifiez surtout l'orthographe exacte du nom de domaine, car les arnaqueurs imitent les vrais sites."},{"q":"Qu'est-ce qu'un gestionnaire de mots de passe ?","options":["Un logiciel qui crée et stocke des mots de passe forts","Un carnet papier posé près de l'ordinateur","Un service qui partage vos mots de passe publiquement"],"correct":0,"explain":"Il génère et retient des mots de passe uniques et complexes, protégés par un seul mot de passe maître à mémoriser."},{"q":"Un SMS vous dit qu'un colis est bloqué et demande de payer via un lien. Réaction ?","options":["Payer immédiatement les quelques euros demandés","Ne pas cliquer et vérifier sur le site officiel du transporteur","Rappeler le numéro et donner sa carte bancaire"],"correct":1,"explain":"Le smishing (phishing par SMS) imite les transporteurs. Vérifiez toujours via l'application ou le site officiel, jamais via le lien reçu."},{"q":"Que faire d'un ancien téléphone avant de le revendre ?","options":["Le vendre tel quel, c'est plus rapide","Effacer les données et réinitialiser aux réglages d'usine","Retirer seulement le fond d'écran"],"correct":1,"explain":"Une réinitialisation d'usine efface vos comptes, photos et données personnelles pour qu'ils ne tombent pas entre de mauvaises mains."},{"q":"Le 2FA par application (type authenticator) est généralement...","options":["Moins sûr que rien du tout","Plus sûr que le code par SMS","Inutile si on a un bon mot de passe"],"correct":1,"explain":"Les applications d'authentification résistent mieux au détournement de carte SIM que les codes envoyés par SMS."},{"q":"Un ami vous envoie sur les réseaux un message étrange avec un lien pressant. Que soupçonner ?","options":["Son compte est peut-être piraté","C'est forcément lui, on clique","Le lien est sûr car il vient d'un ami"],"correct":0,"explain":"Les comptes piratés servent à diffuser des liens malveillants. Vérifiez auprès de la personne par un autre moyen avant de cliquer."},{"q":"Pourquoi éviter de tout partager publiquement sur les réseaux sociaux ?","options":["Cela ralentit votre téléphone","Ces informations aident les arnaqueurs à vous cibler ou usurper votre identité","Cela consomme trop de batterie"],"correct":1,"explain":"Dates, lieux et habitudes publiés facilitent l'usurpation d'identité et les arnaques personnalisées. Limitez les informations visibles."},{"q":"Vous branchez une clé USB trouvée par terre. Bonne idée ?","options":["Oui, pour retrouver le propriétaire","Non, elle peut contenir un logiciel malveillant","Oui, si elle est jolie"],"correct":1,"explain":"Une clé inconnue peut infecter votre appareil dès le branchement. Ne connectez jamais un support dont vous ignorez l'origine."},{"q":"Qu'est-ce qu'un rançongiciel (ransomware) ?","options":["Un jeu vidéo en ligne","Un programme qui chiffre vos fichiers et exige une rançon","Un outil de nettoyage du disque"],"correct":1,"explain":"Le rançongiciel bloque l'accès à vos données contre paiement. De bonnes sauvegardes permettent de restaurer sans céder au chantage."},{"q":"Comment repérer un e-mail de phishing ?","options":["Fautes, adresse d'expéditeur douteuse et sentiment d'urgence","Il contient toujours une pièce jointe PDF","Il arrive uniquement le week-end"],"correct":0,"explain":"Fautes d'orthographe, adresses bizarres, urgence et liens suspects sont des signaux classiques d'une tentative de phishing."},{"q":"Faut-il accepter toutes les demandes d'amis d'inconnus en ligne ?","options":["Oui, plus on a de contacts mieux c'est","Non, un faux profil peut chercher à vous arnaquer","Oui, s'ils ont une belle photo"],"correct":1,"explain":"Les faux profils servent aux arnaques sentimentales ou à collecter vos données. N'acceptez que des personnes que vous connaissez vraiment."},{"q":"Quel est l'intérêt de verrouiller son téléphone avec un code ou la biométrie ?","options":["Cela améliore la qualité photo","Cela protège vos données si l'appareil est perdu ou volé","Cela augmente le stockage disponible"],"correct":1,"explain":"Un verrouillage empêche l'accès à vos messages, comptes et applications de paiement en cas de perte ou de vol."},{"q":"On vous appelle en se faisant passer pour le support technique de Microsoft. Que faire ?","options":["Donner l'accès à distance à votre ordinateur","Raccrocher : Microsoft n'appelle pas les particuliers ainsi","Communiquer votre mot de passe Windows"],"correct":1,"explain":"C'est une arnaque au faux support. Ne donnez jamais l'accès à distance ni vos identifiants à un appel non sollicité."},{"q":"Où télécharger une application mobile en confiance ?","options":["Sur les magasins officiels (App Store, Google Play)","Sur n'importe quel lien reçu par message","Sur un site inconnu proposant la version gratuite"],"correct":0,"explain":"Les magasins officiels contrôlent les applications. Les fichiers installés hors magasin peuvent contenir des logiciels malveillants."},{"q":"Un e-mail contient une pièce jointe inattendue nommée facture.exe. Réaction ?","options":["L'ouvrir pour voir de quoi il s'agit","Ne pas l'ouvrir : un fichier .exe inattendu est très suspect","La transférer à toute la famille"],"correct":1,"explain":"Les fichiers exécutables joints non sollicités sont un vecteur courant de virus. En cas de doute, n'ouvrez pas et supprimez."}]};
 var SEV={"critical":["actively exploited","exploited in the wild","in the wild","0-day","zero-day","zero day","critical vulnerability","critical flaw","rce","remote code execution","ransomware","data breach","breach","backdoor","wormable","emergency patch","under attack","supply chain","cvss 10","cvss 9.8","activement exploite","exploitation active","faille critique","vulnerabilite critique","execution de code a distance","rancongiciel","fuite massive","fuite de donnees","violation de donnees","porte derobee","correctif d'urgence","attaque en cours","prise de controle","compromission"],"important":["patch","security update","vulnerability patched","security advisory","cve-","security fix","hotfix","mitigation","update available","correctif","mise a jour de securite","faille corrigee","avis de securite","bulletin de securite","correctif disponible"]};
 
 function bodyOf(a){return a.body||a.blocks||[];}
@@ -1697,9 +1816,10 @@ function severityOf(a){
 function updateMenace(){
   var el=document.getElementById('menace');if(!el)return;
   var c=0;ALL.forEach(function(a){if(severityOf(a)===2)c++;});
-  var L=c>=6?{t:'Storm',c:'#e5484d'}:c>=3?{t:'Elevated',c:'#e8b23a'}:c>=1?{t:'Watch',c:'#e8b23a'}:{t:'Calm',c:'#3dd68c'};
+  var lv=I18N[LANG].levels;
+  var L=c>=6?{t:lv[6],c:'#e5484d'}:c>=3?{t:lv[3],c:'#e8b23a'}:c>=1?{t:lv[1],c:'#e8b23a'}:{t:lv[0],c:'#3dd68c'};
   el.style.display='inline-flex';
-  el.innerHTML='<span class="pip" style="background:'+L.c+'"></span>Threat level: <b style="color:'+L.c+'">'+L.t+'</b>'+(c?' ('+c+' alert'+(c>1?'s':'')+')':'');
+  el.innerHTML='<span class="pip" style="background:'+L.c+'"></span>'+t('menaceLbl')+' <b style="color:'+L.c+'">'+L.t+'</b>'+(c?' ('+tp(c>1?'alertsN':'alerts1',c)+')':'');
 }
 var VOTES=lsGet('tcd_votes',{});
 function voteSource(src,dir){VOTES[src]=(VOTES[src]||0)+dir;lsSet('tcd_votes',VOTES);}
@@ -1744,7 +1864,7 @@ function glossify(){
   });
 }
 function showGloss(el){
-  var t=el.getAttribute('data-t'),def=GLOSSARY[t];if(!def)return;
+  var t=el.getAttribute('data-t'),def=glossDict()[t];if(!def)return;
   var pop=document.getElementById('glpop');pop.innerHTML='<b>'+esc(t)+'</b><br>'+esc(def);
   var r=el.getBoundingClientRect();pop.style.display='block';
   var top=r.bottom+8,left=Math.min(r.left,window.innerWidth-310);
@@ -1759,7 +1879,7 @@ function enhanceReader(){
     var tl=makeTLDR(a);
     if(tl.length){
       var box=document.createElement('div');box.className='tldr';
-      box.innerHTML='<div class="tl">In short</div><ul>'+tl.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ul>';
+      box.innerHTML='<div class="tl">'+t('inShort')+'</div><ul>'+tl.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ul>';
       var anchor=readerEl.querySelector('.rtime');
       if(anchor)anchor.parentNode.insertBefore(box,anchor.nextSibling);
     }
@@ -1794,7 +1914,7 @@ function shareArticle(a){
   if(!a)return;var text=a.title+' — '+a.link;
   if(window.AndroidBridge&&AndroidBridge.share){AndroidBridge.share(text);return;}
   if(navigator.share){navigator.share({title:a.title,url:a.link}).catch(function(){});return;}
-  try{navigator.clipboard.writeText(text);toast('Link copied');}catch(e){window.prompt('Copy this link:',a.link);}
+  try{navigator.clipboard.writeText(text);toast(t('linkCopied'));}catch(e){window.prompt(t('copyLink'),a.link);}
 }
 
 /* History / archives */
@@ -1809,12 +1929,12 @@ function saveHistory(){
 function openArchives(){
   var hist=lsGet('tcd_history',{});var keys=Object.keys(hist).sort().reverse();
   var m=document.getElementById('archModal'),body=document.getElementById('archBody');
-  if(!keys.length){body.innerHTML='<div style="color:var(--muted);padding:8px 0 4px">No history yet — come back tomorrow.</div>';}
+  if(!keys.length){body.innerHTML='<div style="color:var(--muted);padding:8px 0 4px">'+t('noHist')+'</div>';}
   else{
     body.innerHTML=keys.map(function(k){
-      var d=new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long'});
+      var d=new Date(k+'T12:00:00').toLocaleDateString(loc(),{weekday:'long',day:'numeric',month:'long'});
       var arts=hist[k];
-      return '<div class="archday"><div class="archdate">'+esc(d)+' · '+arts.length+' stories</div>'+
+      return '<div class="archday"><div class="archdate">'+esc(d)+' · '+tp(arts.length>1?'countN':'count1',arts.length)+'</div>'+
         arts.slice(0,12).map(function(a){return '<a class="archlink" href="'+esc(a.link)+'" target="_blank" rel="noopener">'+esc(a.title)+' <span>· '+esc(a.source)+'</span></a>';}).join('')+'</div>';
     }).join('');
   }
@@ -1823,15 +1943,16 @@ function openArchives(){
 
 /* Daily quiz */
 function renderQuiz(){
-  var el=document.getElementById('quiz');if(!el||!QUIZ.length)return;
+  var el=document.getElementById('quiz');if(!el||!QUIZ.en||!QUIZ.en.length)return;
   var start=new Date(new Date().getFullYear(),0,0);var day=Math.floor((new Date()-start)/86400000);
-  var qi=day%QUIZ.length,q=QUIZ[qi];
+  var ql=QUIZ[LANG]||QUIZ.en;
+  var qi=day%ql.length,q=ql[qi];
   var answered=lsGet('tcd_quiz_'+qi,null);
-  var h='<div class="lbl">Daily security quiz</div><div class="qq">'+esc(q.q)+'</div><div class="qopts">';
+  var h='<div class="lbl">'+t('quizLbl')+'</div><div class="qq">'+esc(q.q)+'</div><div class="qopts">';
   var letters=['A','B','C','D'];
   q.options.forEach(function(o,i){var cls='qopt';if(answered!=null){if(i===q.correct)cls+=' ok';else if(i===answered)cls+=' ko';}h+='<button class="'+cls+'" data-qi="'+i+'"'+(answered!=null?' disabled':'')+'><span class="k">'+letters[i]+'</span><span>'+esc(o)+'</span></button>';});
   h+='</div>';
-  if(answered!=null)h+='<div class="qexp">'+(answered===q.correct?'Correct. ':'Not quite. ')+esc(q.explain)+'</div>';
+  if(answered!=null)h+='<div class="qexp">'+(answered===q.correct?t('qOk'):t('qKo'))+esc(q.explain)+'</div>';
   el.innerHTML=h;el.style.display='block';el.setAttribute('data-qi',qi);el.setAttribute('data-correct',q.correct);el.setAttribute('data-exp',q.explain);
 }
 
@@ -1844,13 +1965,14 @@ function checkUpdate(){
     if(!raw)return;var v;try{v=JSON.parse(raw);}catch(e){return;}
     if(v&&v.version&&cmpVer(v.version,APP_VERSION)>0){
       var bar=document.getElementById('updateBar');if(!bar)return;
-      bar.innerHTML='<b>Version '+esc(v.version)+' is available</b> '+(v.notes?'— '+esc(v.notes):'')+' <a href="'+esc(v.apk||v.exe||'#')+'" target="_blank" rel="noopener">Download</a><button class="uc" onclick="this.parentNode.style.display=\'none\'" aria-label="Dismiss">✕</button>';
+      bar.innerHTML='<b>'+t('updAvail').replace('{v}',esc(v.version))+'</b> '+(v.notes?'— '+esc(v.notes):'')+' <a href="'+esc(v.apk||v.exe||'#')+'" target="_blank" rel="noopener">'+t('download')+'</a><button class="uc" onclick="this.parentNode.style.display=\'none\'" aria-label="'+t('dismiss')+'">✕</button>';
       bar.style.display='flex';
     }
   });
 }
 function initFeatures(){
   applyTheme();
+  applyLang();
   checkUpdate();
   renderQuiz();
   var tb=document.getElementById('themeBtn');if(tb)tb.addEventListener('click',toggleTheme);
@@ -1880,9 +2002,10 @@ initFeatures();
 </script>
 </body>
 </html>
+
 '@
 
-$html = $template.Replace('__NEWS_JSON__', $json)
+$html = $template.Replace('__NEWS_JSON__', $json).Replace('__LANG__', $uiLang)
 [System.IO.File]::WriteAllText($outFile, $html, (New-Object System.Text.UTF8Encoding($false)))
 
 # embedded fonts next to the generated page (the UI works offline)

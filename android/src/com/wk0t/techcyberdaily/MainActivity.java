@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private String pendingSpeak = null;
+    private String pendingLang = "en";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,7 +76,7 @@ public class MainActivity extends Activity {
                             });
                         } catch (Exception e) {}
                         ttsReady = true;
-                        if (pendingSpeak != null) { doSpeak(pendingSpeak); pendingSpeak = null; }
+                        if (pendingSpeak != null) { doSpeak(pendingSpeak, pendingLang); pendingSpeak = null; }
                     }
                 }
             });
@@ -90,9 +91,12 @@ public class MainActivity extends Activity {
         try { NotifReceiver.scheduleDaily(this); } catch (Exception e) {}
     }
 
-    private void doSpeak(String text) {
+    private void doSpeak(String text, String lang) {
         if (tts == null || text == null) return;
-        try { tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tcd"); } catch (Exception e) {}
+        try {
+            tts.setLanguage("fr".equals(lang) ? Locale.FRENCH : Locale.ENGLISH);
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "tcd");
+        } catch (Exception e) {}
     }
 
     @Override
@@ -167,13 +171,21 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void speak(final String text) {
+        public void speak(final String text, final String lang) {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if (ttsReady) doSpeak(text); else pendingSpeak = text;
+                    if (ttsReady) doSpeak(text, lang); else { pendingSpeak = text; pendingLang = lang; }
                 }
             });
+        }
+
+        // Stores the UI language so notifications follow it (set from the web UI language picker)
+        @JavascriptInterface
+        public void setLang(String lang) {
+            try {
+                getSharedPreferences("app", MODE_PRIVATE).edit().putString("lang", "fr".equals(lang) ? "fr" : "en").apply();
+            } catch (Exception e) {}
         }
 
         @JavascriptInterface
